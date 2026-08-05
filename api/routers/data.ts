@@ -1,0 +1,203 @@
+import { Router } from 'express';
+import {
+  addAccount,
+  addBudget,
+  addCategory,
+  addTransaction,
+  deleteBudget,
+  deleteCategory,
+  deleteTransaction,
+  ensureCategory,
+  listAccounts,
+  listBudgets,
+  listCategories,
+  listTransactions,
+  updateBudget,
+  updateCategory,
+  DEFAULT_ALERT_THRESHOLD,
+} from '../store';
+import { requireRole } from '../auth';
+import { broadcastChange, broadcastEvent } from '../events';
+
+export const dataRouter: Router = Router();
+
+const isUser = requireRole('user', 'admin', 'superadmin');
+
+dataRouter.get('/transactions', isUser, (req, res) => {
+  const { month, type, category } = req.query;
+  const filters =
+    typeof month === 'string' || typeof type === 'string' || typeof category === 'string'
+      ? {
+          month: typeof month === 'string' ? month : undefined,
+          type: typeof type === 'string' ? type : undefined,
+          category: typeof category === 'string' ? category : undefined,
+        }
+      : undefined;
+  res.json({ transactions: listTransactions(filters) });
+});
+
+dataRouter.post('/transactions', isUser, (req, res) => {
+  const body = req.body ?? {};
+  if (typeof body.amount !== 'number' || Number.isNaN(body.amount)) {
+    res.status(400).json({ error: 'amount is required and must be a number.' });
+    return;
+  }
+  const { transaction: tx, alert } = addTransaction({
+    type: body.type || 'expense',
+    amount: body.amount,
+    currency: body.currency || '₹',
+    category: body.category || 'Other',
+    description: body.description || 'Untitled transaction',
+    account: body.account || 'Physical Wallet',
+    payment_method: body.payment_method || 'UPI',
+    date: body.date || new Date().toISOString().split('T')[0],
+    confidence: body.confidence,
+    ai_parsed: body.ai_parsed,
+    engine_used: body.engine_used,
+    status: body.status || 'completed',
+    notes: body.notes,
+    tags: Array.isArray(body.tags) ? body.tags : undefined,
+  });
+  broadcastChange();
+  if (alert) broadcastEvent('budget-alert', alert);
+  ensureCategory(tx.category, tx.type === 'income' ? 'income' : tx.type === 'transfer' ? 'transfer' : 'expense');
+  res.status(201).json({ transaction: tx, alert: alert ?? null });
+});
+
+dataRouter.delete('/transactions/:id', isUser, (req, res) => {
+  const deleted = deleteTransaction(req.params.id);
+  if (!deleted) {
+    res.status(404).json({ error: 'Transaction not found.' });
+    return;
+  }
+  broadcastChange();
+  res.json({ success: true });
+});
+
+dataRouter.get('/accounts', isUser, (req, res) => {
+  res.json({ accounts: listAccounts() });
+});
+
+dataRouter.post('/accounts', isUser, (req, res) => {
+  const body = req.body ?? {};
+  if (!body.name || typeof body.name !== 'string') {
+    res.status(400).json({ error: 'name is required.' });
+    return;
+  }
+  const account = addAccount({
+    name: body.name,
+    type: body.type || 'Bank',
+    balance: Number(body.balance) || 0,
+    currency: body.currency || '₹',
+    accountNumber: body.accountNumber,
+    color: body.color || '#3B82F6',
+    icon: body.icon || 'Landmark',
+  });
+  broadcastChange();
+  res.status(201).json({ account });
+});
+
+dataRouter.get('/budgets', isUser, (req, res) => {
+  res.json({ budgets: listBudgets() });
+});
+
+dataRouter.post('/budgets', isUser, (req, res) => {
+  const body = req.body ?? {};
+  if (!body.category || typeof body.category !== 'string') {
+    res.status(400).json({ error: 'category is required.' });
+    return;
+  }
+  const budget = addBudget({
+    category: body.category,
+    monthlyLimit: Number(body.monthlyLimit) || 0,
+    spent: Number(body.spent) || 0,
+    period: body.period || new Date().toISOString().slice(0, 7),
+    alertThreshold: Number(body.alertThreshold) || DEFAULT_ALERT_THRESHOLD,
+  });
+  ensureCategory(budget.category, 'expense');
+  broadcastChange();
+  res.status(201).json({ budget });
+});
+
+dataRouter.put('/budgets/:id', isUser, (req, res) => {
+  const body = req.body ?? {};
+  const budget = updateBudget(req.params.id, {
+    category: typeof body.category === 'string' ? body.category : undefined,
+    monthlyLimit: body.monthlyLimit !== undefined ? Number(body.monthlyLimit) || 0 : undefined,
+    spent: body.spent !== undefined ? Number(body.spent) || 0 : undefined,
+    period: typeof body.period === 'string' ? body.period : undefined,
+    alertThreshold: body.alertThreshold !== undefined ? Number(body.alertThreshold) || DEFAULT_ALERT_THRESHOLD : undefined,
+  });
+  if (!budget) {
+    res.status(404).json({ error: 'Budget not found.' });
+    return;
+  }
+  if (body.category && typeof body.category === 'string') {
+    ensureCategory(budget.category, 'expense');
+  }
+  broadcastChange();
+  res.json({ budget });
+});
+
+dataRouter.delete('/budgets/:id', isUser, (req, res) => {
+  if (!deleteBudget(req.params.id)) {
+    res.status(404).json({ error: 'Budget not found.' });
+    return;
+  }
+  broadcastChange();
+  res.json({ success: true });
+});
+
+dataRouter.get('/categories', isUser, (req, res) => {
+  res.json({ categories: listCategories() });
+});
+
+dataRouter.post('/categories', isUser, (req, res) => {
+  const body = req.body ?? {};
+  if (!body.name || typeof body.name !== 'string' || !body.name.trim()) {
+    res.status(400).json({ error: 'name is required.' });
+    return;
+  }
+  const type: 'income' | 'expense' | 'transfer' = ['income', 'expense', 'transfer'].includes(body.type) ? body.type : 'expense';
+  const cat = addCategory({
+    name: body.name,
+    parent: typeof body.parent === 'string' ? body.parent : undefined,
+    type,
+    icon: typeof body.icon === 'string' ? body.icon : undefined,
+    color: typeof body.color === 'string' ? body.color : undefined,
+    keywords: Array.isArray(body.keywords) ? body.keywords.map(String) : undefined,
+  });
+  if (!cat) {
+    res.status(409).json({ error: 'A category with this name already exists.' });
+    return;
+  }
+  broadcastChange();
+  res.status(201).json({ category: cat });
+});
+
+dataRouter.put('/categories/:id', isUser, (req, res) => {
+  const body = req.body ?? {};
+  const cat = updateCategory(req.params.id, {
+    name: typeof body.name === 'string' ? body.name : undefined,
+    parent: body.parent !== undefined ? (body.parent === null ? null : String(body.parent)) : undefined,
+    type: ['income', 'expense', 'transfer'].includes(body.type) ? body.type : undefined,
+    icon: typeof body.icon === 'string' ? body.icon : undefined,
+    color: typeof body.color === 'string' ? body.color : undefined,
+    keywords: Array.isArray(body.keywords) ? body.keywords.map(String) : undefined,
+  });
+  if (!cat) {
+    res.status(404).json({ error: 'Category not found.' });
+    return;
+  }
+  broadcastChange();
+  res.json({ category: cat });
+});
+
+dataRouter.delete('/categories/:id', isUser, (req, res) => {
+  if (!deleteCategory(req.params.id)) {
+    res.status(404).json({ error: 'Category not found.' });
+    return;
+  }
+  broadcastChange();
+  res.json({ success: true });
+});

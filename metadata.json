@@ -1,0 +1,6 @@
+{
+  "name": "FlowLedger AI Financial Platform",
+  "description": "Modular monorepo: isolated App / Admin / Super Admin modules sharing an API gateway powered by local Ollama Qwen (qwen2.5:3b) natural language transaction parsing with a confidence engine.",
+  "requestFramePermissions": [],
+  "majorCapabilities": []
+}

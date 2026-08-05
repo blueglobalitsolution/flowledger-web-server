@@ -1,0 +1,13 @@
+node_modules/
+build/
+dist/
+coverage/
+.DS_Store
+*.log
+.env*
+!.env.example
+data/
+*.apk
+*.aab
+# Mobile app lives in its own separate git repository.
+mobile/
