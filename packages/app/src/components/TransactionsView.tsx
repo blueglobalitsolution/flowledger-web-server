@@ -17,14 +17,12 @@ interface TransactionsViewProps {
   transactions: Transaction[];
   onDeleteTransaction: (id: string) => void;
   onOpenNewTransactionModal: () => void;
-  onBulkInsert: () => void;
 }
 
 export const TransactionsView: React.FC<TransactionsViewProps> = ({
   transactions,
   onDeleteTransaction,
   onOpenNewTransactionModal,
-  onBulkInsert,
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [filterType, setFilterType] = useState<string>('all');
@@ -79,16 +77,7 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({
             </p>
           </div>
 
-          <div className="flex flex-wrap items-center gap-2">
-            <button
-              onClick={onBulkInsert}
-              className="bg-indigo-600/80 hover:bg-indigo-500 text-white font-medium px-3.5 py-2 rounded-xl text-xs flex items-center gap-1.5 cursor-pointer transition-all border border-indigo-500/40"
-            >
-              <FileSpreadsheet className="w-4 h-4" />
-              <span>Spreadsheet Bulk Insert</span>
-            </button>
-
-            <button
+          <div className="flex flex-wrap items-center gap-2">            <button
               onClick={handleExportCSV}
               className="bg-slate-800 hover:bg-slate-700 text-emerald-300 font-medium px-3.5 py-2 rounded-xl text-xs flex items-center gap-1.5 cursor-pointer border border-slate-700"
             >

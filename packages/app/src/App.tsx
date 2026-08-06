@@ -11,7 +11,8 @@ import { TransactionFormModal } from './components/TransactionFormModal';
 import { LoginView } from './components/LoginView';
 import { Peel } from './components/Peel';
 import { Sidebar } from './components/Sidebar';
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
+import { motion, AnimatePresence } from 'framer-motion';
 
 import { AVAILABLE_AI_ENGINES } from '@shared/mockData';
 import {
@@ -44,6 +45,17 @@ import {
   updateCategory,
 } from '@shared/api';
 
+const PageTransition = ({ children }: { children: React.ReactNode }) => (
+  <motion.div
+    initial={{ opacity: 0, y: 10, filter: 'blur(4px)' }}
+    animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
+    exit={{ opacity: 0, y: -10, filter: 'blur(4px)' }}
+    transition={{ duration: 0.3, ease: 'easeOut' }}
+  >
+    {children}
+  </motion.div>
+);
+
 export default function App() {
   const [activeEngine, setActiveEngine] = useState<AIEngineConfig>(AVAILABLE_AI_ENGINES[0]);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
@@ -51,6 +63,7 @@ export default function App() {
   const [budgets, setBudgets] = useState<Budget[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const location = useLocation();
 
   // Authentication State
   const [currentUser, setCurrentUser] = useState<AuthUser | null>(getStoredSession()?.user ?? null);
@@ -184,43 +197,6 @@ export default function App() {
     await refreshData();
   };
 
-  const handleBulkInsert = async () => {
-    const bulkMock: Omit<Transaction, 'id'>[] = [
-      {
-        type: 'expense',
-        amount: 350,
-        currency: '₹',
-        category: 'Food & Dining',
-        description: 'Starbucks Coffee & Muffin',
-        account: 'ICICI Sapphire',
-        payment_method: 'Credit Card',
-        date: '2026-08-02',
-        confidence: 96,
-        ai_parsed: true,
-        engine_used: activeEngine.name,
-        status: 'completed',
-      },
-      {
-        type: 'expense',
-        amount: 1200,
-        currency: '₹',
-        category: 'Shopping & Apparel',
-        description: 'Bookstore Fiction & Tech Magazines',
-        account: 'Physical Wallet',
-        payment_method: 'Cash',
-        date: '2026-08-02',
-        confidence: 95,
-        ai_parsed: true,
-        engine_used: activeEngine.name,
-        status: 'completed',
-      },
-    ];
-    for (const tx of bulkMock) {
-      const { alert } = await createTransaction(tx);
-      showBudgetAlert(alert);
-    }
-    await refreshData();
-  };
 
   const handleAddAccount = async (acc: Account) => {
     const { id, ...input } = acc;
@@ -260,7 +236,6 @@ export default function App() {
 
   if (!currentUser) {
     return (
-      <BrowserRouter>
         <Routes>
           <Route path="/login" element={
             <LoginView onLogin={(user) => {
@@ -270,21 +245,20 @@ export default function App() {
           } />
           <Route path="*" element={<Navigate to="/login" replace />} />
         </Routes>
-      </BrowserRouter>
     );
   }
 
   return (
-    <BrowserRouter>
       <Peel
         side="left"
         mode="cursor"
-        reveal={260}
+        reveal={320}
         zone={180}
+        smoothing={0.15}
         className="w-full min-h-screen"
         under={<Sidebar currentUser={currentUser} onLogout={handleLogout} />}
       >
-        <div id="flowledger-root" className="min-h-screen bg-slate-950 text-slate-100 font-sans selection:bg-emerald-500 selection:text-slate-950 flex flex-col">
+        <div id="flowledger-root" className="min-h-screen text-slate-100 font-sans flex flex-col" style={{ background: '#181d27', minHeight: '100vh' }}>
           {/* Main View Container */}
           <main className="flex-1 w-full mx-auto px-6 py-8">
             {isLoading && (
@@ -293,76 +267,93 @@ export default function App() {
               </div>
             )}
             
-            <Routes>
-              <Route path="/login" element={<Navigate to="/dashboard" replace />} />
-              <Route path="/" element={<Navigate to="/dashboard" replace />} />
-              
-              <Route path="/dashboard" element={
-                <DashboardView
-                  transactions={transactions}
-                  accounts={accounts}
-                  budgets={budgets}
-                  activeEngine={activeEngine}
-                  onQuickParse={handleQuickParse}
-                  onOpenNewTransactionModal={() => {
-                    setTransactionModalData(null);
-                    setIsTransactionModalOpen(true);
-                  }}
-                />
-              } />
+            <AnimatePresence mode="wait">
+              <Routes location={location} key={location.pathname}>
+                <Route path="/login" element={<Navigate to="/dashboard" replace />} />
+                <Route path="/" element={<Navigate to="/dashboard" replace />} />
+                
+                <Route path="/dashboard" element={
+                  <PageTransition>
+                    <DashboardView
+                      transactions={transactions}
+                      accounts={accounts}
+                      budgets={budgets}
+                      activeEngine={activeEngine}
+                      onQuickParse={handleQuickParse}
+                      onOpenNewTransactionModal={() => {
+                        setTransactionModalData(null);
+                        setIsTransactionModalOpen(true);
+                      }}
+                    />
+                  </PageTransition>
+                } />
 
-              <Route path="/transactions" element={
-                <TransactionsView
-                  transactions={transactions}
-                  onDeleteTransaction={handleDeleteTransaction}
-                  onOpenNewTransactionModal={() => {
-                    setTransactionModalData(null);
-                    setIsTransactionModalOpen(true);
-                  }}
-                  onBulkInsert={handleBulkInsert}
-                />
-              } />
+                <Route path="/transactions" element={
+                  <PageTransition>
+                    <TransactionsView
+                      transactions={transactions}
+                      onDeleteTransaction={handleDeleteTransaction}
+                      onOpenNewTransactionModal={() => {
+                        setTransactionModalData(null);
+                        setIsTransactionModalOpen(true);
+                      }}
+                    />
+                  </PageTransition>
+                } />
 
-              <Route path="/spreadsheet" element={
-                <SpreadsheetView
-                  transactions={transactions}
-                  onOpenNewTransactionModal={() => {
-                    setTransactionModalData(null);
-                    setIsTransactionModalOpen(true);
-                  }}
-                />
-              } />
+                <Route path="/spreadsheet" element={
+                  <PageTransition>
+                    <SpreadsheetView
+                      transactions={transactions}
+                      onOpenNewTransactionModal={() => {
+                        setTransactionModalData(null);
+                        setIsTransactionModalOpen(true);
+                      }}
+                    />
+                  </PageTransition>
+                } />
 
-              <Route path="/reports" element={<ReportsView transactions={transactions} accounts={accounts} />} />
+                <Route path="/reports" element={
+                  <PageTransition>
+                    <ReportsView transactions={transactions} accounts={accounts} />
+                  </PageTransition>
+                } />
 
-              <Route path="/budgets" element={
-                <BudgetsView
-                  budgets={budgets}
-                  categories={categories}
-                  transactions={transactions}
-                  onCreateBudget={handleCreateBudget}
-                  onUpdateBudget={handleUpdateBudget}
-                  onDeleteBudget={handleDeleteBudget}
-                  onCreateCategory={handleCreateCategory}
-                  onUpdateCategory={handleUpdateCategory}
-                  onDeleteCategory={handleDeleteCategory}
-                />
-              } />
+                <Route path="/budgets" element={
+                  <PageTransition>
+                    <BudgetsView
+                      budgets={budgets}
+                      categories={categories}
+                      transactions={transactions}
+                      onCreateBudget={handleCreateBudget}
+                      onUpdateBudget={handleUpdateBudget}
+                      onDeleteBudget={handleDeleteBudget}
+                      onCreateCategory={handleCreateCategory}
+                      onUpdateCategory={handleUpdateCategory}
+                      onDeleteCategory={handleDeleteCategory}
+                    />
+                  </PageTransition>
+                } />
 
-              <Route path="/accounts" element={
-                <AccountsView
-                  accounts={accounts}
-                  onAddAccount={handleAddAccount}
-                />
-              } />
+                <Route path="/accounts" element={
+                  <PageTransition>
+                    <AccountsView
+                      accounts={accounts}
+                      onAddAccount={handleAddAccount}
+                    />
+                  </PageTransition>
+                } />
 
-              <Route path="/ai-sandbox" element={
-                <AIEngineSandboxView
-                  activeEngine={activeEngine}
-                  onRunTestParse={handleSandboxTestParse}
-                />
-              } />
-            </Routes>
+                <Route path="/ai-sandbox" element={
+                  <PageTransition>
+                    <AIEngineSandboxView
+                      activeEngine={activeEngine}
+                      onRunTestParse={handleSandboxTestParse}
+                    />
+                  </PageTransition>
+                } />
+              </Routes>
+            </AnimatePresence>
           </main>
 
           {/* Modals */}
@@ -442,6 +433,5 @@ export default function App() {
           )}
         </div>
       </Peel>
-    </BrowserRouter>
   );
 }

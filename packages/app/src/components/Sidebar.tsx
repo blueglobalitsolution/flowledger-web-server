@@ -24,35 +24,77 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentUser, onLogout }) => {
   const currentPath = location.pathname;
 
   const links = [
-    { id: 'dashboard', path: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
+    { id: 'dashboard',    path: '/dashboard',    label: 'Dashboard',    icon: LayoutDashboard },
     { id: 'transactions', path: '/transactions', label: 'Transactions', icon: ReceiptText },
-    { id: 'spreadsheet', path: '/spreadsheet', label: 'Spreadsheet', icon: Table },
-    { id: 'reports', path: '/reports', label: 'Reports', icon: BarChart3 },
-    { id: 'budgets', path: '/budgets', label: 'Budgets', icon: PieChart },
-    { id: 'accounts', path: '/accounts', label: 'Accounts', icon: Landmark },
-    { id: 'ai-sandbox', path: '/ai-sandbox', label: 'AI Engine', icon: BrainCircuit },
+    { id: 'spreadsheet',  path: '/spreadsheet',  label: 'Spreadsheet',  icon: Table },
+    { id: 'reports',      path: '/reports',      label: 'Reports',      icon: BarChart3 },
+    { id: 'budgets',      path: '/budgets',      label: 'Budgets',      icon: PieChart },
+    { id: 'accounts',     path: '/accounts',     label: 'Accounts',     icon: Landmark },
+    { id: 'ai-sandbox',   path: '/ai-sandbox',   label: 'AI Engine',    icon: BrainCircuit },
   ];
 
   return (
-    <aside className="w-[260px] min-h-screen bg-slate-900 border-r border-slate-800 flex flex-col justify-between p-6 select-none font-sans text-white">
-      {/* Brand logo & header */}
-      <div className="space-y-8">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-emerald-500 via-teal-500 to-indigo-600 flex items-center justify-center text-white shadow-lg shadow-emerald-500/20">
-            <Layers className="w-5 h-5 text-white" />
+    <aside
+      style={{
+        width: '260px',
+        minHeight: '100vh',
+        backgroundColor: '#181d27',
+        borderRight: '1px solid #252b37',
+        display: 'flex',
+        flexDirection: 'column',
+        justifyContent: 'space-between',
+        padding: '28px 16px',
+        userSelect: 'none',
+        fontFamily: "'Inter', sans-serif",
+      }}
+    >
+      {/* Brand */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', paddingLeft: '8px' }}>
+          <div
+            style={{
+              width: '40px',
+              height: '40px',
+              borderRadius: '12px',
+              background: 'linear-gradient(135deg, #bcfc6a 0%, #8c63e6 100%)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              flexShrink: 0,
+              boxShadow: 'rgba(188, 252, 106, 0.3) 0px 4px 12px',
+            }}
+          >
+            <Layers style={{ width: '20px', height: '20px', color: '#000000' }} />
           </div>
           <div>
-            <h1 className="font-display text-xl font-bold tracking-tight leading-none text-white">
+            <h1
+              style={{
+                fontSize: '18px',
+                fontWeight: 700,
+                color: '#ffffff',
+                margin: 0,
+                lineHeight: '1.2',
+                letterSpacing: '-0.5px',
+              }}
+            >
               FlowLedger
             </h1>
-            <span className="text-[10px] uppercase tracking-wider font-semibold text-emerald-400">
+            <span
+              style={{
+                fontSize: '10px',
+                textTransform: 'uppercase',
+                letterSpacing: '1px',
+                fontWeight: 600,
+                color: '#bcfc6a',
+              }}
+            >
               v1.0 SaaS Engine
             </span>
           </div>
         </div>
 
-        {/* Navigation links */}
-        <nav className="flex flex-col gap-1">
+        {/* Navigation */}
+        <nav style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
           {links.map((link) => {
             const Icon = link.icon;
             const isActive = currentPath === link.path;
@@ -60,13 +102,43 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentUser, onLogout }) => {
               <button
                 key={link.id}
                 onClick={() => navigate(link.path)}
-                className={`flex items-center gap-3 w-full px-4 py-3 rounded-lg font-medium text-xs transition-all cursor-pointer text-left ${
-                  isActive
-                    ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 shadow-sm font-semibold'
-                    : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
-                }`}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '12px',
+                  width: '100%',
+                  padding: '11px 12px',
+                  borderRadius: '10px',
+                  fontWeight: isActive ? 600 : 400,
+                  fontSize: '14px',
+                  textAlign: 'left',
+                  cursor: 'pointer',
+                  border: isActive ? '1px solid rgba(188, 252, 106, 0.2)' : '1px solid transparent',
+                  background: isActive ? 'rgba(188, 252, 106, 0.1)' : 'transparent',
+                  color: isActive ? '#bcfc6a' : '#535862',
+                  transition: 'all 0.15s ease',
+                }}
+                onMouseEnter={(e) => {
+                  if (!isActive) {
+                    (e.currentTarget as HTMLElement).style.color = '#ffffff';
+                    (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.05)';
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (!isActive) {
+                    (e.currentTarget as HTMLElement).style.color = '#535862';
+                    (e.currentTarget as HTMLElement).style.background = 'transparent';
+                  }
+                }}
               >
-                <Icon className={`w-4 h-4 ${isActive ? 'text-emerald-400' : 'text-slate-400'}`} />
+                <Icon
+                  style={{
+                    width: '16px',
+                    height: '16px',
+                    color: isActive ? '#bcfc6a' : '#535862',
+                    flexShrink: 0,
+                  }}
+                />
                 <span>{link.label}</span>
               </button>
             );
@@ -74,23 +146,93 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentUser, onLogout }) => {
         </nav>
       </div>
 
-      {/* User profile / Logout at the bottom */}
+      {/* User profile & Logout */}
       {currentUser && (
-        <div className="border-t border-slate-850 pt-4 flex flex-col gap-3">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-emerald-500 to-indigo-600 text-slate-950 font-bold flex items-center justify-center text-sm shadow-md">
+        <div
+          style={{
+            borderTop: '1px solid #252b37',
+            paddingTop: '20px',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '12px',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '0 4px' }}>
+            <div
+              style={{
+                width: '38px',
+                height: '38px',
+                borderRadius: '100px',
+                background: 'linear-gradient(135deg, #bcfc6a, #8c63e6)',
+                color: '#000000',
+                fontWeight: 700,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: '13px',
+                flexShrink: 0,
+              }}
+            >
               {currentUser.name.substring(0, 2).toUpperCase()}
             </div>
-            <div className="flex-1 min-w-0">
-              <p className="font-bold text-xs text-white truncate">{currentUser.name}</p>
-              <p className="text-[10px] text-slate-450 truncate font-mono">{currentUser.email}</p>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <p
+                style={{
+                  fontWeight: 600,
+                  fontSize: '13px',
+                  color: '#ffffff',
+                  margin: 0,
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                {currentUser.name}
+              </p>
+              <p
+                style={{
+                  fontSize: '11px',
+                  color: '#535862',
+                  margin: 0,
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap',
+                  fontFamily: 'monospace',
+                }}
+              >
+                {currentUser.email}
+              </p>
             </div>
           </div>
           <button
             onClick={onLogout}
-            className="flex items-center justify-center gap-2 w-full py-2.5 bg-slate-950 hover:bg-slate-800 text-white border border-slate-800 rounded-lg text-xs font-semibold transition-all cursor-pointer"
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '8px',
+              width: '100%',
+              padding: '10px',
+              background: '#252b37',
+              color: '#ffffff',
+              border: '1px solid #252b37',
+              borderRadius: '10px',
+              fontSize: '13px',
+              fontWeight: 600,
+              cursor: 'pointer',
+              transition: 'all 0.15s ease',
+              fontFamily: "'Inter', sans-serif",
+            }}
+            onMouseEnter={(e) => {
+              (e.currentTarget as HTMLElement).style.background = '#2f3849';
+              (e.currentTarget as HTMLElement).style.borderColor = '#3a4255';
+            }}
+            onMouseLeave={(e) => {
+              (e.currentTarget as HTMLElement).style.background = '#252b37';
+              (e.currentTarget as HTMLElement).style.borderColor = '#252b37';
+            }}
           >
-            <LogOut className="w-3.5 h-3.5 text-white" />
+            <LogOut style={{ width: '14px', height: '14px' }} />
             <span>Sign Out</span>
           </button>
         </div>

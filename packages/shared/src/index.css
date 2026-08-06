@@ -1,19 +1,134 @@
-@import url('https://api.fontshare.com/v2/css?f[]=satoshi@400,500,700&display=swap');
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+/* ================================================
+   MezPay Design System — FlowLedger
+   Source: https://mezpay.framer.website/
+   ================================================ */
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&display=swap');
 @import "tailwindcss";
 
+/* ── Design Tokens ── */
 @theme {
   --font-sans: 'Inter', sans-serif;
-  --font-display: 'Satoshi', sans-serif;
+  --font-display: 'Inter', sans-serif;
 }
 
-/* Force headings to Satoshi font */
-h1, h2, h3, h4, h5, h6, .font-display {
-  font-family: 'Satoshi', sans-serif !important;
-  font-weight: 500 !important;
-  letter-spacing: -0.02em !important;
-}
+/* ── Global Base ── */
+*, *::before, *::after { box-sizing: border-box; }
 
-body {
+html, body, #root {
+  margin: 0;
+  padding: 0;
+  min-height: 100vh;
+  background-color: #181d27;
+  color: #ffffff;
   font-family: 'Inter', sans-serif;
+  -webkit-font-smoothing: antialiased;
 }
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: 'Inter', sans-serif !important;
+  color: #ffffff;
+  margin: 0;
+}
+
+/* ── Scrollbar ── */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: #181d27; }
+::-webkit-scrollbar-thumb { background: #252b37; border-radius: 100px; }
+::-webkit-scrollbar-thumb:hover { background: #535862; }
+
+/* ══════════════════════════════════════════════════════
+   GLOBAL TAILWIND CLASS OVERRIDES — MezPay Remapping
+   Remaps all hardcoded slate/emerald classes across
+   all components to MezPay design tokens.
+   ══════════════════════════════════════════════════════ */
+
+/* ── Background Colors ── */
+.bg-slate-950, .bg-slate-900, .bg-slate-800 { background-color: #181d27 !important; }
+.bg-slate-850                               { background-color: #1e2330 !important; }
+.bg-slate-700, .bg-slate-600               { background-color: #252b37 !important; }
+.bg-slate-500                              { background-color: #303848 !important; }
+
+/* Hover bg */
+.hover\:bg-slate-800:hover,
+.hover\:bg-slate-900:hover { background-color: #252b37 !important; }
+.hover\:bg-slate-700:hover { background-color: #2f3849 !important; }
+.hover\:bg-slate-800\/60:hover { background-color: rgba(37, 43, 55, 0.8) !important; }
+
+/* ── Text Colors ── */
+.text-slate-100, .text-slate-200 { color: #ffffff !important; }
+.text-slate-300                  { color: #e2e8f0 !important; }
+.text-slate-400, .text-slate-450 { color: #535862 !important; }
+.text-slate-500                  { color: #535862 !important; }
+.text-white                      { color: #ffffff !important; }
+
+/* ── Border Colors ── */
+.border-slate-900                               { border-color: #181d27 !important; }
+.border-slate-800, .border-slate-700,
+.border-slate-600                               { border-color: #252b37 !important; }
+.divide-slate-800 > * + *                       { border-color: #252b37 !important; }
+
+/* ── Emerald → MezPay Lime (#bcfc6a) ── */
+.bg-emerald-500, .bg-emerald-400, .bg-emerald-600 { background-color: #bcfc6a !important; }
+.hover\:bg-emerald-400:hover,
+.hover\:bg-emerald-600:hover                       { background-color: #a8e85c !important; }
+
+.text-emerald-400, .text-emerald-500,
+.text-emerald-300                                  { color: #bcfc6a !important; }
+.hover\:text-emerald-400:hover                     { color: #bcfc6a !important; }
+
+.border-emerald-500, .border-emerald-400,
+.border-emerald-600                                { border-color: #bcfc6a !important; }
+
+.focus\:border-emerald-500:focus                   { border-color: #bcfc6a !important; }
+.focus\:ring-emerald-500:focus                     { --tw-ring-color: #bcfc6a !important; }
+
+/* Emerald tinted backgrounds */
+.bg-emerald-500\/10, .bg-emerald-400\/10,
+.bg-emerald-600\/10                              { background-color: rgba(188, 252, 106, 0.08) !important; }
+.bg-emerald-500\/20                              { background-color: rgba(188, 252, 106, 0.15) !important; }
+
+/* Emerald tinted borders */
+.border-emerald-500\/30, .border-emerald-400\/30,
+.border-emerald-600\/30                          { border-color: rgba(188, 252, 106, 0.25) !important; }
+.border-emerald-500\/20                          { border-color: rgba(188, 252, 106, 0.15) !important; }
+
+/* Emerald shadows */
+.shadow-emerald-500\/20                          { box-shadow: rgba(188, 252, 106, 0.2) 0px 4px 16px !important; }
+
+/* ── Indigo/Violet → MezPay Purple (#8c63e6) ── */
+.bg-violet-500, .bg-indigo-500,
+.bg-indigo-600, .bg-purple-500                 { background-color: #8c63e6 !important; }
+.hover\:bg-indigo-600:hover                    { background-color: #7a52d4 !important; }
+
+.text-violet-400, .text-indigo-400,
+.text-purple-400, .text-indigo-300,
+.text-violet-300                               { color: #c4b5fd !important; }
+
+.border-violet-500, .border-indigo-500         { border-color: #8c63e6 !important; }
+
+.bg-indigo-500\/20, .bg-violet-500\/20         { background-color: rgba(140, 99, 230, 0.15) !important; }
+.bg-indigo-500\/10                             { background-color: rgba(140, 99, 230, 0.08) !important; }
+
+/* ── Gradient Remapping ── */
+.from-emerald-500, .from-emerald-400 { --tw-gradient-from: #bcfc6a !important; }
+.from-emerald-600                    { --tw-gradient-from: #a8e85c !important; }
+.to-indigo-600, .to-indigo-500       { --tw-gradient-to: #8c63e6 !important; }
+.via-teal-500                        { --tw-gradient-via: #8c63e6 !important; }
+
+/* ── Teal → blend to purple ── */
+.bg-teal-500, .bg-teal-400, .bg-teal-600      { background-color: #8c63e6 !important; }
+.text-teal-400, .text-teal-300                { color: #bcfc6a !important; }
+
+/* ── Input focus global ── */
+input:focus, select:focus, textarea:focus {
+  border-color: #bcfc6a !important;
+  box-shadow: 0 0 0 3px rgba(188, 252, 106, 0.1) !important;
+  outline: none !important;
+}
+
+/* ── Misc utility ── */
+.selection\:bg-emerald-500::selection { background-color: rgba(188, 252, 106, 0.3) !important; }
+
+/* ── Rounded overrides for pill buttons ── */
+.rounded-full { border-radius: 100px !important; }

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { AuthUser, UserRole } from '@shared/types';
 import { login, forgotPassword, verifyOtp, resetPassword } from '@shared/api';
+import { Layers } from 'lucide-react';
 
 interface LoginViewProps {
   onLogin: (user: AuthUser) => void;
@@ -41,28 +42,83 @@ export const DEMO_USERS: Record<UserRole, AuthUser> = {
 
 type Step = 'login' | 'forgot-email' | 'forgot-otp' | 'forgot-reset';
 
+// ── Shared style helpers ──
+const inputStyle: React.CSSProperties = {
+  display: 'block',
+  width: '100%',
+  background: '#252b37',
+  border: '1px solid #252b37',
+  borderRadius: '10px',
+  color: '#ffffff',
+  fontFamily: "'Inter', sans-serif",
+  fontSize: '14px',
+  padding: '12px 16px',
+  outline: 'none',
+  transition: 'border-color 0.2s ease',
+  marginTop: '8px',
+};
+
+const labelStyle: React.CSSProperties = {
+  display: 'block',
+  fontSize: '13px',
+  fontWeight: 500,
+  color: '#ffffff',
+};
+
+const primaryBtnStyle: React.CSSProperties = {
+  width: '100%',
+  padding: '13px 24px',
+  background: '#bcfc6a',
+  color: '#000000',
+  border: 'none',
+  borderRadius: '100px',
+  fontSize: '14px',
+  fontWeight: 600,
+  cursor: 'pointer',
+  fontFamily: "'Inter', sans-serif",
+  transition: 'background 0.2s ease, box-shadow 0.2s ease',
+  boxShadow: 'rgba(188, 252, 106, 0.2) 0px 4px 16px',
+};
+
+const ghostBtnStyle: React.CSSProperties = {
+  width: '100%',
+  padding: '10px 16px',
+  background: 'transparent',
+  color: '#535862',
+  border: 'none',
+  borderRadius: '100px',
+  fontSize: '13px',
+  fontWeight: 500,
+  cursor: 'pointer',
+  fontFamily: "'Inter', sans-serif",
+  transition: 'color 0.2s ease',
+  textAlign: 'center' as const,
+};
+
 export const LoginView: React.FC<LoginViewProps> = ({ onLogin }) => {
   const [email, setEmail] = useState(DEMO_USERS.user.email);
   const [password, setPassword] = useState('');
   const [authSuccessMsg, setAuthSuccessMsg] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
-  // Password reset state
   const [step, setStep] = useState<Step>('login');
   const [otp, setOtp] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [simulatedOtp, setSimulatedOtp] = useState<string | null>(null);
 
+  const clearMessages = () => {
+    setErrorMsg(null);
+    setAuthSuccessMsg(null);
+  };
+
   const handleFormSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setErrorMsg(null);
+    clearMessages();
     try {
-      setAuthSuccessMsg(`Login verified for ${email}`);
+      setAuthSuccessMsg(`Verifying login for ${email}…`);
       const session = await login(email, 'user');
-      setTimeout(() => {
-        onLogin(session.user);
-      }, 500);
+      setTimeout(() => onLogin(session.user), 400);
     } catch (err: any) {
       setAuthSuccessMsg(null);
       setErrorMsg(err.message || 'Login failed. Please try again.');
@@ -71,16 +127,13 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLogin }) => {
 
   const handleForgotEmailSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setErrorMsg(null);
-    setAuthSuccessMsg(null);
+    clearMessages();
     setSimulatedOtp(null);
     try {
       const res = await forgotPassword(email);
       if (res.success) {
         setAuthSuccessMsg(res.otp ? 'OTP code generated.' : 'OTP code sent to your email.');
-        if (res.otp) {
-          setSimulatedOtp(res.otp);
-        }
+        if (res.otp) setSimulatedOtp(res.otp);
         setStep('forgot-otp');
       }
     } catch (err: any) {
@@ -90,12 +143,11 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLogin }) => {
 
   const handleVerifyOtpSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setErrorMsg(null);
-    setAuthSuccessMsg(null);
+    clearMessages();
     try {
       const res = await verifyOtp(email, otp);
       if (res.success) {
-        setAuthSuccessMsg('OTP verified successfully.');
+        setAuthSuccessMsg('OTP verified.');
         setStep('forgot-reset');
       }
     } catch (err: any) {
@@ -105,18 +157,15 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLogin }) => {
 
   const handleResetPasswordSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setErrorMsg(null);
-    setAuthSuccessMsg(null);
-
+    clearMessages();
     if (newPassword !== confirmPassword) {
       setErrorMsg('Passwords do not match.');
       return;
     }
-
     try {
       const res = await resetPassword(email, otp, newPassword);
       if (res.success) {
-        setAuthSuccessMsg('Password updated successfully! You can now log in.');
+        setAuthSuccessMsg('Password updated! You can now log in.');
         setStep('login');
         setPassword('');
         setOtp('');
@@ -129,261 +178,378 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLogin }) => {
     }
   };
 
-  return (
-    <div className="flex min-h-screen items-center justify-center bg-slate-950 text-white font-sans">
-      <div className="flex flex-1 flex-col justify-center px-4 py-10 lg:px-6">
-        <div className="sm:mx-auto sm:w-full sm:max-w-sm space-y-6">
-          
-          {/* Header Title */}
-          <h2 className="text-balance text-center font-display font-semibold text-white text-xl">
-            {step === 'login' && 'Log in or create account'}
-            {step === 'forgot-email' && 'Reset your password'}
-            {step === 'forgot-otp' && 'Verify OTP Code'}
-            {step === 'forgot-reset' && 'Choose a new password'}
-          </h2>
+  const titles: Record<Step, string> = {
+    'login': 'Welcome back',
+    'forgot-email': 'Reset your password',
+    'forgot-otp': 'Enter verification code',
+    'forgot-reset': 'Choose a new password',
+  };
 
-          {/* Success and Error messages */}
+  const subtitles: Record<Step, string> = {
+    'login': 'Sign in to your FlowLedger account',
+    'forgot-email': "We'll send a 6-digit OTP to your email",
+    'forgot-otp': `Code sent to ${email} — valid for 3 minutes`,
+    'forgot-reset': 'Your identity is verified — set a new password',
+  };
+
+  return (
+    <div
+      style={{
+        minHeight: '100vh',
+        background: '#181d27',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        fontFamily: "'Inter', sans-serif",
+        padding: '24px',
+      }}
+    >
+      <div style={{ width: '100%', maxWidth: '400px' }}>
+        {/* Logo */}
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '12px',
+            marginBottom: '40px',
+            justifyContent: 'center',
+          }}
+        >
+          <div
+            style={{
+              width: '44px',
+              height: '44px',
+              borderRadius: '12px',
+              background: 'linear-gradient(135deg, #bcfc6a 0%, #8c63e6 100%)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              boxShadow: 'rgba(188, 252, 106, 0.3) 0px 4px 16px',
+            }}
+          >
+            <Layers style={{ width: '22px', height: '22px', color: '#000000' }} />
+          </div>
+          <div>
+            <div
+              style={{
+                fontSize: '20px',
+                fontWeight: 700,
+                color: '#ffffff',
+                letterSpacing: '-0.5px',
+                lineHeight: '1.2',
+              }}
+            >
+              FlowLedger
+            </div>
+            <div style={{ fontSize: '11px', color: '#bcfc6a', fontWeight: 600, letterSpacing: '1px', textTransform: 'uppercase' }}>
+              v1.0 SaaS Engine
+            </div>
+          </div>
+        </div>
+
+        {/* Card */}
+        <div
+          style={{
+            background: '#252b37',
+            borderRadius: '24px',
+            padding: '36px',
+            border: '1px solid rgba(255,255,255,0.05)',
+            boxShadow: 'rgba(0,0,0,0.3) 0px 24px 48px',
+          }}
+        >
+          {/* Title */}
+          <div style={{ marginBottom: '28px' }}>
+            <h2
+              style={{
+                fontSize: '24px',
+                fontWeight: 700,
+                color: '#ffffff',
+                margin: 0,
+                letterSpacing: '-0.5px',
+                lineHeight: '1.3',
+              }}
+            >
+              {titles[step]}
+            </h2>
+            <p style={{ fontSize: '14px', color: '#535862', margin: '6px 0 0 0', lineHeight: '1.5' }}>
+              {subtitles[step]}
+            </p>
+          </div>
+
+          {/* Feedback messages */}
           {authSuccessMsg && (
-            <div className="p-3 bg-emerald-500/10 border border-emerald-500/30 rounded-xl text-xs text-emerald-400 font-bold text-center">
+            <div
+              style={{
+                padding: '12px 16px',
+                background: 'rgba(188, 252, 106, 0.08)',
+                border: '1px solid rgba(188, 252, 106, 0.25)',
+                borderRadius: '10px',
+                fontSize: '13px',
+                color: '#bcfc6a',
+                fontWeight: 500,
+                marginBottom: '20px',
+                lineHeight: '1.5',
+              }}
+            >
               {authSuccessMsg}
             </div>
           )}
 
           {errorMsg && (
-            <div className="p-3 bg-rose-500/10 border border-rose-500/30 rounded-xl text-xs text-rose-400 font-bold text-center">
+            <div
+              style={{
+                padding: '12px 16px',
+                background: 'rgba(239, 68, 68, 0.08)',
+                border: '1px solid rgba(239, 68, 68, 0.25)',
+                borderRadius: '10px',
+                fontSize: '13px',
+                color: '#f87171',
+                fontWeight: 500,
+                marginBottom: '20px',
+                lineHeight: '1.5',
+              }}
+            >
               {errorMsg}
             </div>
           )}
 
-          {/* Simulated OTP Notification Banner */}
+          {/* SMTP fallback OTP banner */}
           {simulatedOtp && (
-            <div className="p-3 bg-indigo-500/20 border border-indigo-500/40 rounded-xl text-xs text-indigo-300 font-bold text-center">
-              [DEVELOPER SIMULATION]<br/>
-              SMTP not configured. OTP sent: <strong className="text-white text-sm select-all">{simulatedOtp}</strong>
+            <div
+              style={{
+                padding: '12px 16px',
+                background: 'rgba(140, 99, 230, 0.12)',
+                border: '1px solid rgba(140, 99, 230, 0.3)',
+                borderRadius: '10px',
+                fontSize: '12px',
+                color: '#c4b5fd',
+                fontWeight: 500,
+                marginBottom: '20px',
+                lineHeight: '1.6',
+                textAlign: 'center',
+              }}
+            >
+              [DEVELOPER MODE] SMTP not configured<br />
+              OTP:{' '}
+              <strong style={{ color: '#ffffff', fontSize: '18px', letterSpacing: '4px', fontFamily: 'monospace' }}>
+                {simulatedOtp}
+              </strong>
             </div>
           )}
 
-          {/* STEP 1: Login Form */}
+          {/* ─── LOGIN FORM ─── */}
           {step === 'login' && (
-            <form onSubmit={handleFormSubmit} className="space-y-4">
+            <form onSubmit={handleFormSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
               <div>
-                <label className="block font-medium text-slate-300 text-sm" htmlFor="email-login">
-                  Email
-                </label>
+                <label style={labelStyle} htmlFor="email-login">Email address</label>
                 <input
-                  autoComplete="email"
-                  required
-                  className="mt-2 block w-full rounded-lg border border-slate-800 bg-slate-900 px-3 py-2 text-sm text-white placeholder-slate-500 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500 font-mono"
                   id="email-login"
-                  name="email"
-                  placeholder="ephraim@blocks.so"
                   type="email"
+                  required
+                  autoComplete="email"
+                  placeholder="you@company.com"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
+                  style={inputStyle}
+                  onFocus={(e) => { (e.target as HTMLInputElement).style.borderColor = '#bcfc6a'; }}
+                  onBlur={(e) => { (e.target as HTMLInputElement).style.borderColor = '#252b37'; }}
                 />
               </div>
               <div>
-                <div className="flex items-center justify-between">
-                  <label className="block font-medium text-slate-300 text-sm" htmlFor="password-login">
-                    Password
-                  </label>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <label style={labelStyle} htmlFor="password-login">Password</label>
                   <button
                     type="button"
-                    onClick={() => {
-                      setErrorMsg(null);
-                      setAuthSuccessMsg(null);
-                      setStep('forgot-email');
+                    onClick={() => { clearMessages(); setStep('forgot-email'); }}
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      color: '#bcfc6a',
+                      fontSize: '12px',
+                      fontWeight: 600,
+                      cursor: 'pointer',
+                      padding: 0,
+                      fontFamily: "'Inter', sans-serif",
                     }}
-                    className="text-xs text-[#0000ee] hover:underline cursor-pointer font-semibold"
                   >
                     Forgot password?
                   </button>
                 </div>
                 <input
-                  autoComplete="current-password"
-                  required
-                  className="mt-2 block w-full rounded-lg border border-slate-800 bg-slate-900 px-3 py-2 text-sm text-white placeholder-slate-500 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500 font-mono"
                   id="password-login"
-                  name="password"
-                  placeholder="**************"
                   type="password"
+                  required
+                  autoComplete="current-password"
+                  placeholder="••••••••••••"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
+                  style={inputStyle}
+                  onFocus={(e) => { (e.target as HTMLInputElement).style.borderColor = '#bcfc6a'; }}
+                  onBlur={(e) => { (e.target as HTMLInputElement).style.borderColor = '#252b37'; }}
                 />
               </div>
               <button
-                className="mt-6 w-full rounded-lg bg-white hover:bg-slate-200 text-black py-2.5 font-semibold text-sm transition-all cursor-pointer shadow-lg"
                 type="submit"
+                style={{ ...primaryBtnStyle, marginTop: '8px' }}
+                onMouseEnter={(e) => {
+                  (e.currentTarget as HTMLElement).style.background = '#a8e85c';
+                  (e.currentTarget as HTMLElement).style.boxShadow = 'rgba(188, 252, 106, 0.35) 0px 6px 24px';
+                }}
+                onMouseLeave={(e) => {
+                  (e.currentTarget as HTMLElement).style.background = '#bcfc6a';
+                  (e.currentTarget as HTMLElement).style.boxShadow = 'rgba(188, 252, 106, 0.2) 0px 4px 16px';
+                }}
               >
                 Sign in
               </button>
-            </form>
-          )}
-
-          {/* STEP 2: Forgot Password - Enter Email */}
-          {step === 'forgot-email' && (
-            <form onSubmit={handleForgotEmailSubmit} className="space-y-4">
-              <p className="text-xs text-slate-400 leading-relaxed text-center">
-                Enter your email address. If the account exists, we will send you a 6-digit OTP code to reset your password.
-              </p>
-              <div>
-                <label className="block font-medium text-slate-300 text-sm" htmlFor="forgot-email-input">
-                  Email Address
-                </label>
-                <input
-                  required
-                  className="mt-2 block w-full rounded-lg border border-slate-800 bg-slate-900 px-3 py-2 text-sm text-white placeholder-slate-500 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500 font-mono"
-                  id="forgot-email-input"
-                  placeholder="name@company.com"
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                />
-              </div>
-              <div className="flex flex-col gap-2 pt-2">
-                <button
-                  className="w-full rounded-lg bg-white hover:bg-slate-200 text-black py-2.5 font-semibold text-sm transition-all cursor-pointer shadow-lg"
-                  type="submit"
-                >
-                  Send OTP
-                </button>
+              <div style={{ textAlign: 'center' }}>
                 <button
                   type="button"
-                  onClick={() => {
-                    setErrorMsg(null);
-                    setAuthSuccessMsg(null);
-                    setStep('login');
-                  }}
-                  className="w-full text-xs text-slate-450 hover:text-white transition-all cursor-pointer py-1 text-center font-medium"
+                  onClick={() => setEmail(DEMO_USERS.user.email)}
+                  style={ghostBtnStyle}
+                  onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.color = '#ffffff'; }}
+                  onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.color = '#535862'; }}
                 >
-                  Back to Log In
+                  Use demo: {DEMO_USERS.user.email}
                 </button>
               </div>
             </form>
           )}
 
-          {/* STEP 3: Forgot Password - Verify OTP */}
-          {step === 'forgot-otp' && (
-            <form onSubmit={handleVerifyOtpSubmit} className="space-y-4">
-              <p className="text-xs text-slate-400 leading-relaxed text-center">
-                We have generated a 6-digit verification code. Please enter the OTP below. It is valid for exactly <strong>3 minutes</strong>.
-              </p>
+          {/* ─── FORGOT EMAIL FORM ─── */}
+          {step === 'forgot-email' && (
+            <form onSubmit={handleForgotEmailSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
               <div>
-                <label className="block font-medium text-slate-300 text-sm" htmlFor="otp-input">
-                  Enter 6-digit OTP
-                </label>
+                <label style={labelStyle} htmlFor="forgot-email-input">Email address</label>
                 <input
+                  id="forgot-email-input"
+                  type="email"
+                  required
+                  placeholder="you@company.com"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  style={inputStyle}
+                  onFocus={(e) => { (e.target as HTMLInputElement).style.borderColor = '#bcfc6a'; }}
+                  onBlur={(e) => { (e.target as HTMLInputElement).style.borderColor = '#252b37'; }}
+                />
+              </div>
+              <button type="submit" style={{ ...primaryBtnStyle, marginTop: '8px' }}>
+                Send OTP
+              </button>
+              <button
+                type="button"
+                onClick={() => { clearMessages(); setStep('login'); }}
+                style={ghostBtnStyle}
+                onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.color = '#ffffff'; }}
+                onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.color = '#535862'; }}
+              >
+                ← Back to Sign In
+              </button>
+            </form>
+          )}
+
+          {/* ─── OTP VERIFY FORM ─── */}
+          {step === 'forgot-otp' && (
+            <form onSubmit={handleVerifyOtpSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
+              <div>
+                <label style={labelStyle} htmlFor="otp-input">6-digit verification code</label>
+                <input
+                  id="otp-input"
+                  type="text"
                   required
                   maxLength={6}
                   pattern="\d{6}"
-                  className="mt-2 block w-full rounded-lg border border-slate-800 bg-slate-900 px-3 py-2.5 text-center text-lg tracking-widest text-white placeholder-slate-500 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500 font-mono"
-                  id="otp-input"
                   placeholder="000000"
-                  type="text"
                   value={otp}
                   onChange={(e) => setOtp(e.target.value.replace(/\D/g, ''))}
-                />
-              </div>
-              <div className="flex flex-col gap-2 pt-2">
-                <button
-                  className="w-full rounded-lg bg-white hover:bg-slate-200 text-black py-2.5 font-semibold text-sm transition-all cursor-pointer shadow-lg"
-                  type="submit"
-                >
-                  Verify Code
-                </button>
-                <button
-                  type="button"
-                  onClick={handleForgotEmailSubmit}
-                  className="w-full text-xs text-[#0000ee] hover:underline transition-all cursor-pointer py-1 text-center font-semibold"
-                >
-                  Resend OTP Code
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setErrorMsg(null);
-                    setAuthSuccessMsg(null);
-                    setStep('forgot-email');
+                  style={{
+                    ...inputStyle,
+                    textAlign: 'center',
+                    fontSize: '24px',
+                    fontWeight: 700,
+                    letterSpacing: '8px',
+                    fontFamily: 'monospace',
                   }}
-                  className="w-full text-xs text-slate-450 hover:text-white transition-all cursor-pointer py-1 text-center font-medium"
-                >
-                  Change Email
-                </button>
-              </div>
-            </form>
-          )}
-
-          {/* STEP 4: Forgot Password - Reset Password */}
-          {step === 'forgot-reset' && (
-            <form onSubmit={handleResetPasswordSubmit} className="space-y-4">
-              <p className="text-xs text-slate-400 leading-relaxed text-center">
-                Your email is verified. Please enter and confirm a new password for your account.
-              </p>
-              <div>
-                <label className="block font-medium text-slate-300 text-sm" htmlFor="new-password">
-                  New Password
-                </label>
-                <input
-                  required
-                  minLength={6}
-                  className="mt-2 block w-full rounded-lg border border-slate-800 bg-slate-900 px-3 py-2 text-sm text-white focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500 font-mono"
-                  id="new-password"
-                  placeholder="New password"
-                  type="password"
-                  value={newPassword}
-                  onChange={(e) => setNewPassword(e.target.value)}
+                  onFocus={(e) => { (e.target as HTMLInputElement).style.borderColor = '#bcfc6a'; }}
+                  onBlur={(e) => { (e.target as HTMLInputElement).style.borderColor = '#252b37'; }}
                 />
               </div>
-              <div>
-                <label className="block font-medium text-slate-300 text-sm" htmlFor="confirm-password">
-                  Confirm Password
-                </label>
-                <input
-                  required
-                  className="mt-2 block w-full rounded-lg border border-slate-800 bg-slate-900 px-3 py-2 text-sm text-white focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500 font-mono"
-                  id="confirm-password"
-                  placeholder="Confirm password"
-                  type="password"
-                  value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
-                />
-              </div>
-              <div className="flex flex-col gap-2 pt-2">
-                <button
-                  className="w-full rounded-lg bg-white hover:bg-slate-200 text-black py-2.5 font-semibold text-sm transition-all cursor-pointer shadow-lg"
-                  type="submit"
-                >
-                  Reset Password
-                </button>
-              </div>
-            </form>
-          )}
-
-          {/* Quick Demo Login Link Helper */}
-          {step === 'login' && (
-            <div className="text-center pt-2">
+              <button type="submit" style={{ ...primaryBtnStyle, marginTop: '8px' }}>
+                Verify Code
+              </button>
               <button
                 type="button"
-                onClick={() => setEmail(DEMO_USERS.user.email)}
-                className="text-xs text-slate-400 hover:text-emerald-400 underline transition-all cursor-pointer"
+                onClick={handleForgotEmailSubmit}
+                style={{ ...ghostBtnStyle, color: '#bcfc6a' }}
               >
-                Use demo account email ({DEMO_USERS.user.email})
+                Resend OTP
               </button>
-            </div>
+              <button
+                type="button"
+                onClick={() => { clearMessages(); setStep('forgot-email'); }}
+                style={ghostBtnStyle}
+                onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.color = '#ffffff'; }}
+                onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.color = '#535862'; }}
+              >
+                Change email
+              </button>
+            </form>
           )}
 
-          <p className="mt-6 text-center text-slate-500 text-xs leading-relaxed">
-            By signing in, you agree to our{' '}
-            <a className="underline underline-offset-4 hover:text-slate-300" href="#">
-              terms of service
-            </a>{' '}
-            and{' '}
-            <a className="underline underline-offset-4 hover:text-slate-300" href="#">
-              privacy policy
-            </a>
-            .
-          </p>
+          {/* ─── RESET PASSWORD FORM ─── */}
+          {step === 'forgot-reset' && (
+            <form onSubmit={handleResetPasswordSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
+              <div>
+                <label style={labelStyle} htmlFor="new-password">New password</label>
+                <input
+                  id="new-password"
+                  type="password"
+                  required
+                  minLength={6}
+                  placeholder="New password"
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  style={inputStyle}
+                  onFocus={(e) => { (e.target as HTMLInputElement).style.borderColor = '#bcfc6a'; }}
+                  onBlur={(e) => { (e.target as HTMLInputElement).style.borderColor = '#252b37'; }}
+                />
+              </div>
+              <div>
+                <label style={labelStyle} htmlFor="confirm-password">Confirm password</label>
+                <input
+                  id="confirm-password"
+                  type="password"
+                  required
+                  placeholder="Confirm password"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  style={inputStyle}
+                  onFocus={(e) => { (e.target as HTMLInputElement).style.borderColor = '#bcfc6a'; }}
+                  onBlur={(e) => { (e.target as HTMLInputElement).style.borderColor = '#252b37'; }}
+                />
+              </div>
+              <button type="submit" style={{ ...primaryBtnStyle, marginTop: '8px' }}>
+                Reset Password
+              </button>
+            </form>
+          )}
         </div>
+
+        {/* Footer */}
+        <p
+          style={{
+            textAlign: 'center',
+            marginTop: '24px',
+            fontSize: '12px',
+            color: '#535862',
+            lineHeight: '1.6',
+          }}
+        >
+          By signing in, you agree to our{' '}
+          <a href="#" style={{ color: '#bcfc6a', textDecoration: 'none' }}>Terms of Service</a>{' '}
+          and{' '}
+          <a href="#" style={{ color: '#bcfc6a', textDecoration: 'none' }}>Privacy Policy</a>.
+        </p>
       </div>
     </div>
   );

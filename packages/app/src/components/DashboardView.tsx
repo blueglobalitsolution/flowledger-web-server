@@ -77,64 +77,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
   return (
     <div className="space-y-6 pb-12">
-      {/* Top Banner: Quick AI Natural Language Parser */}
-      <div id="ai-quick-parser-card" className="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 border border-indigo-500/30 rounded-2xl p-6 shadow-xl relative overflow-hidden">
-        <div className="absolute top-0 right-0 w-80 h-80 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
-        <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
-          <div className="space-y-1">
-            <div className="flex items-center gap-2">
-              <span className="p-1.5 rounded-lg bg-emerald-500/20 text-emerald-300 ring-1 ring-emerald-500/30">
-                <Sparkles className="w-4 h-4" />
-              </span>
-              <h2 className="text-lg font-bold text-white tracking-tight">
-                Natural Language AI Transaction Entry
-              </h2>
-            </div>
-            <p className="text-xs text-slate-300 max-w-xl">
-              Type or speak any financial transaction. Powered by{' '}
-              <strong className="text-emerald-300 font-mono">{activeEngine.name}</strong> with
-              confidence auto-routing (&gt;95% auto-save, 80-95% user check).
-            </p>
-          </div>
 
-          {/* Quick Natural Language Prompt Form */}
-          <form onSubmit={handleParseSubmit} className="flex-1 max-w-xl flex items-center gap-2">
-            <div className="relative flex-1">
-              <input
-                type="text"
-                value={promptText}
-                onChange={(e) => setPromptText(e.target.value)}
-                placeholder="e.g., Tea ₹30 at Chai Corner via UPI, or Uber $45 to office on Credit Card"
-                className="w-full bg-slate-950/80 border border-indigo-500/40 rounded-xl px-4 py-3 text-sm text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:border-transparent shadow-inner font-sans"
-              />
-              <button
-                type="button"
-                onClick={() => setPromptText('Tea ₹30 at local stall via UPI')}
-                className="absolute right-3 top-2.5 text-[11px] text-emerald-400 hover:text-emerald-300 bg-emerald-950/80 px-2 py-0.5 rounded border border-emerald-500/30 cursor-pointer font-mono"
-              >
-                Try "Tea ₹30"
-              </button>
-            </div>
-            <button
-              type="submit"
-              disabled={isParsing || !promptText.trim()}
-              className="bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-semibold px-5 py-3 rounded-xl transition-all shadow-lg shadow-emerald-500/20 disabled:opacity-50 flex items-center gap-2 cursor-pointer text-sm whitespace-nowrap"
-            >
-              {isParsing ? (
-                <>
-                  <Zap className="w-4 h-4 animate-spin" />
-                  <span>Parsing...</span>
-                </>
-              ) : (
-                <>
-                  <Send className="w-4 h-4" />
-                  <span>AI Parse</span>
-                </>
-              )}
-            </button>
-          </form>
-        </div>
-      </div>
 
       {/* Financial Overview Stat Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">

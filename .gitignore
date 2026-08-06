@@ -11,3 +11,4 @@ data/
 *.aab
 # Mobile app lives in its own separate git repository.
 mobile/
+.kanban/

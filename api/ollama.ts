@@ -1,7 +1,6 @@
 import type { Category } from '@shared/types';
-import { SEPARATOR } from './seed-categories';
 
-export const OLLAMA_HOST = process.env.OLLAMA_HOST || 'http://localhost:11434';
+export const OLLAMA_HOST = process.env.OLLAMA_HOST || 'http://192.168.1.9:11434';
 export const OLLAMA_MODEL = process.env.OLLAMA_MODEL || 'qwen2.5:3b';
 
 const TODAY = new Date().toISOString().split('T')[0];
@@ -15,8 +14,8 @@ export function accountConstraint(accounts?: string[]): string {
 /// Serializes the business's category tree into the system prompt so the model
 /// classifies against the user's real categories (any business type).
 export function buildCategoryInstruction(categories: Category[]): string {
-  const topLevels = categories.filter((c) => !c.path?.includes(SEPARATOR));
-  const leaves = categories.filter((c) => c.path?.includes(SEPARATOR));
+  const topLevels = categories.filter((c) => !c.path?.includes(' > '));
+  const leaves = categories.filter((c) => c.path?.includes(' > '));
 
   const byType: Record<string, string[]> = { income: [], expense: [], transfer: [] };
   for (const group of topLevels) {
@@ -142,13 +141,13 @@ export function resolveCategory(
   const addKeyword = (kw: string, path: string) => {
     const key = norm(kw);
     if (key.length < 2) return;
-    const isLeaf = path.includes(SEPARATOR);
+    const isLeaf = path.includes(' > ');
     const arr = index.get(key) ?? [];
     if (isLeaf) {
-      const filtered = arr.filter((p) => p.includes(SEPARATOR));
+      const filtered = arr.filter((p) => p.includes(' > '));
       if (!filtered.includes(path)) filtered.push(path);
       index.set(key, filtered);
-    } else if (!arr.some((p) => p.includes(SEPARATOR))) {
+    } else if (!arr.some((p) => p.includes(' > '))) {
       if (!arr.includes(path)) arr.push(path);
       index.set(key, arr);
     }

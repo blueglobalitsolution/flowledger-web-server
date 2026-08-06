@@ -2,7 +2,6 @@ import { DatabaseSync } from 'node:sqlite';
 import { dirname, join, resolve } from 'node:path';
 import { mkdirSync } from 'node:fs';
 import type { Account, Budget, BudgetAlert, Category, Transaction, TransactionType } from '@shared/types';
-import { buildSeedCategories, SEPARATOR } from './seed-categories';
 
 export const DEFAULT_ALERT_THRESHOLD = 90;
 
@@ -86,21 +85,6 @@ if (!catCols.has('keywords')) db.exec('ALTER TABLE categories ADD COLUMN keyword
 const txCols = new Set((db.prepare('PRAGMA table_info(transactions)').all() as { name: string }[]).map((c) => c.name));
 if (!txCols.has('tags')) db.exec('ALTER TABLE transactions ADD COLUMN tags TEXT');
 
-// Seed the category tree once. Replace stale single-level categories from the
-// pre-taxonomy build (rows without a " > " path) with the full taxonomy.
-function seedCategoriesIfNeeded(): void {
-  const existing = db.prepare('SELECT COUNT(*) AS n FROM categories').get() as unknown as { n: number };
-  const hasTree = (db.prepare('SELECT COUNT(*) AS n FROM categories WHERE path LIKE ?').get(`%${SEPARATOR}%`) as unknown as { n: number }).n > 0;
-  if (hasTree) return;
-  if (existing.n > 0) db.exec('DELETE FROM categories');
-  const insert = db.prepare(
-    'INSERT INTO categories (id, name, path, parent, type, icon, color, budgetLimit, keywords) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)'
-  );
-  for (const c of buildSeedCategories()) {
-    insert.run(c.id, c.name, c.path, c.parent ?? null, c.type, c.icon, c.color, c.budgetLimit ?? null, c.keywords ? JSON.stringify(c.keywords) : null);
-  }
-}
-seedCategoriesIfNeeded();
 
 interface TxRow {
   id: string;
@@ -513,12 +497,12 @@ export function recomputeBudgetSpent(): void {
   const budgets = db.prepare('SELECT * FROM budgets').all() as unknown as BudgetRow[];
   const txs = listTxStmt.all() as unknown as TxRow[];
   for (const b of budgets) {
-    const isTop = !b.category.includes(SEPARATOR);
+    const isTop = !b.category.includes(' > ');
     const spent = txs
       .filter((t) => t.type === 'expense')
       .filter((t) => {
         if (t.category === b.category) return true;
-        if (isTop && (t.category.split(SEPARATOR)[0] ?? t.category) === b.category) return true;
+        if (isTop && (t.category.split(' > ')[0] ?? t.category) === b.category) return true;
         return false;
       })
       .reduce((s, t) => s + (t.amount || 0), 0);
@@ -571,8 +555,8 @@ export function ensureCategory(path: string, type: 'income' | 'expense' | 'trans
   const existing = selectCategoryByPathStmt.get(path) as unknown as CategoryRow | undefined;
   if (existing) return toCategory(existing);
 
-  const parent = path.includes(SEPARATOR) ? path.split(SEPARATOR)[0] : path;
-  const name = path.includes(SEPARATOR) ? path.split(SEPARATOR).slice(1).join(SEPARATOR) : path;
+  const parent = path.includes(' > ') ? path.split(' > ')[0] : path;
+  const name = path.includes(' > ') ? path.split(' > ').slice(1).join(' > ') : path;
   const color = type === 'income' ? '#10B981' : type === 'transfer' ? '#3B82F6' : '#EF4444';
   const cat: Category = {
     id: nextId('cat'),
@@ -593,7 +577,7 @@ export function ensureCategory(path: string, type: 'income' | 'expense' | 'trans
 /// Adds a new category (top-level or "Parent > Leaf"). For leaves, the parent
 /// must exist. Returns null if the path already exists.
 export function addCategory(input: { name: string; parent?: string; type: 'income' | 'expense' | 'transfer'; icon?: string; color?: string; keywords?: string[] }): Category | null {
-  const path = input.parent && input.parent.trim() ? `${input.parent.trim()}${SEPARATOR}${input.name.trim()}` : input.name.trim();
+  const path = input.parent && input.parent.trim() ? `${input.parent.trim()} > ${input.name.trim()}` : input.name.trim();
   if (selectCategoryByPathStmt.get(path)) return null;
 
   const parentRow = input.parent && input.parent.trim() ? (selectCategoryByPathStmt.get(input.parent.trim()) as unknown as CategoryRow | undefined) : undefined;
@@ -621,7 +605,7 @@ export function updateCategory(id: string, patch: { name?: string; parent?: stri
 
   const name = patch.name?.trim() || existing.name;
   const parent = patch.parent !== undefined ? (patch.parent?.trim() || null) : existing.parent;
-  const path = parent ? `${parent}${SEPARATOR}${name}` : name;
+  const path = parent ? `${parent} > ${name}` : name;
   const type = patch.type ?? (existing.type as Category['type']);
   const color = patch.color || existing.color;
   const keywords = patch.keywords && patch.keywords.length ? patch.keywords : (existing.keywords ? (JSON.parse(existing.keywords) as string[]) : [name.toLowerCase()]);

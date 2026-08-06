@@ -1,63 +1,32 @@
+"use client";
+
 import React, {
   useEffect,
   useRef,
   useState,
-  useSyncExternalStore,
+  useCallback,
   type ReactNode,
 } from "react";
-import html2canvas from "html2canvas";
+import { toCanvas } from "html-to-image";
+import { useLocation } from "react-router-dom";
 
 export type PeelSide = "left" | "right" | "top" | "bottom";
-
 export type PeelMode = "cursor" | "hover";
 
 export interface PeelOptions {
-  /** Edge the content peels from. */
   side?: PeelSide;
-  /** How the peel is driven. "cursor" peels progressively as the pointer nears the edge, "hover" peels fully when the pointer enters the zone. */
   mode?: PeelMode;
-  /** How many CSS pixels of the under layer are exposed at full peel. */
   reveal?: number;
-  /** Width of the strip along the chosen edge that drives the peel, in CSS pixels. */
   zone?: number;
-  /** Radius of the curl in CSS pixels. Smaller values fold sharper. */
   curl?: number;
-  /** Extra lift at the middle of the peeling edge in CSS pixels. Negative values bow the sheet inwards. */
   bow?: number;
-  /** Strength of the curl shading on the lifted sheet (0 to 1). */
   shade?: number;
-  /** Strength of the shine along the peeling edge that follows the cursor (0 to 1). */
   shine?: number;
-  /** Distance from the edge at which the shine starts to appear, in CSS pixels. 0 uses the full container span. */
   shineDistance?: number;
-  /** Shine color as RGB in the 0 to 1 range, or "auto" to follow the page theme: light shine on dark backgrounds, dark shine on light ones. Re-resolves on theme changes. */
   shineColor?: [number, number, number] | "auto";
-  /** How many CSS pixels the peeled edge bulges toward the cursor. */
   bulge?: number;
-  /** Perspective focal length in CSS pixels. Lower values exaggerate the 3D depth. */
   perspective?: number;
-  /** Seconds the peel takes to settle. Higher feels more damped. */
   smoothing?: number;
-}
-
-export interface PeelElements {
-  /** Canvas with layoutsubtree that hosts the HTML content. */
-  source: HTMLCanvasElement;
-  /** The element inside the source canvas that gets captured. */
-  content: HTMLElement;
-  /** Canvas the WebGL effect renders to. */
-  output: HTMLCanvasElement;
-  /** Element revealed underneath the peel. Kept hidden until the first capture is ready. */
-  under?: HTMLElement;
-}
-
-export interface PeelInstance {
-  /** Update effect options live. */
-  setOptions: (options: PeelOptions) => void;
-  /** Re-read canvas size. Call when the element is resized. */
-  resize: () => void;
-  /** Stop the loop and release all GPU resources. */
-  destroy: () => void;
 }
 
 const DEFAULTS: Required<PeelOptions> = {
@@ -81,15 +50,6 @@ const SIDE_INDEX: Record<PeelSide, number> = {
   right: 1,
   top: 2,
   bottom: 3,
-};
-
-type PaintableCanvas = HTMLCanvasElement & {
-  onpaint?: (() => void) | null;
-  requestPaint?: () => void;
-};
-
-type ElementImageContext = CanvasRenderingContext2D & {
-  drawElementImage?: (element: Element, x: number, y: number) => void;
 };
 
 const SHEET_VERT = `#version 300 es
@@ -191,485 +151,12 @@ void main () {
 
 const SEG = 96;
 
-export function supportsHtmlInCanvas(): boolean {
-  if (typeof document === "undefined") return false;
-  const probe = document.createElement("canvas") as PaintableCanvas;
-  const ctx = probe.getContext("2d") as ElementImageContext | null;
-  return Boolean(
-    ctx &&
-    typeof ctx.drawElementImage === "function" &&
-    typeof probe.requestPaint === "function",
-  );
-}
-
-export function createPeel(
-  elements: PeelElements,
-  options: PeelOptions = {},
-): PeelInstance | null {
-  const config = { ...DEFAULTS, ...options };
-  const { source, content, output, under } = elements;
-
-  const gl = output.getContext("webgl2", {
-    alpha: true,
-    depth: true,
-    stencil: false,
-    antialias: true,
-    premultipliedAlpha: true,
-  });
-  if (!gl || gl.isContextLost()) return null;
-
-  const sourceCtx = source.getContext("2d") as ElementImageContext | null;
-  const paintable = source as PaintableCanvas;
-  const htmlInCanvas = true;
-
-  let wake = () => {};
-  let capture = () => {};
-
-  if (htmlInCanvas) {
-    paintable.onpaint = () => capture();
-  }
-
-  function compile(type: number, text: string): WebGLShader {
-    const shader = gl!.createShader(type)!;
-    gl!.shaderSource(shader, text);
-    gl!.compileShader(shader);
-    if (!gl!.getShaderParameter(shader, gl!.COMPILE_STATUS)) {
-      console.error("Peel shader error:", gl!.getShaderInfoLog(shader));
-    }
-    return shader;
-  }
-
-  function link(vertText: string, fragText: string) {
-    const vert = compile(gl!.VERTEX_SHADER, vertText);
-    const frag = compile(gl!.FRAGMENT_SHADER, fragText);
-    const program = gl!.createProgram()!;
-    gl!.attachShader(program, vert);
-    gl!.attachShader(program, frag);
-    gl!.linkProgram(program);
-    const uniforms: Record<string, WebGLUniformLocation> = {};
-    const count = gl!.getProgramParameter(program, gl!.ACTIVE_UNIFORMS);
-    for (let i = 0; i < count; i++) {
-      const info = gl!.getActiveUniform(program, i)!;
-      uniforms[info.name] = gl!.getUniformLocation(program, info.name)!;
-    }
-    return { program, vert, frag, uniforms };
-  }
-
-  const sheet = link(SHEET_VERT, SHEET_FRAG);
-
-  const gridVerts = new Float32Array((SEG + 1) * (SEG + 1) * 2);
-  for (let y = 0; y <= SEG; y++) {
-    for (let x = 0; x <= SEG; x++) {
-      const i = (y * (SEG + 1) + x) * 2;
-      gridVerts[i] = x / SEG;
-      gridVerts[i + 1] = y / SEG;
-    }
-  }
-  const gridIndices = new Uint32Array(SEG * SEG * 6);
-  let offset = 0;
-  for (let y = 0; y < SEG; y++) {
-    for (let x = 0; x < SEG; x++) {
-      const a = y * (SEG + 1) + x;
-      const b = a + 1;
-      const c = a + SEG + 1;
-      const d = c + 1;
-      gridIndices[offset++] = a;
-      gridIndices[offset++] = c;
-      gridIndices[offset++] = b;
-      gridIndices[offset++] = b;
-      gridIndices[offset++] = c;
-      gridIndices[offset++] = d;
-    }
-  }
-
-  const sheetVao = gl.createVertexArray();
-  gl.bindVertexArray(sheetVao);
-  const gridBuffer = gl.createBuffer();
-  gl.bindBuffer(gl.ARRAY_BUFFER, gridBuffer);
-  gl.bufferData(gl.ARRAY_BUFFER, gridVerts, gl.STATIC_DRAW);
-  gl.enableVertexAttribArray(0);
-  gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
-  const indexBuffer = gl.createBuffer();
-  gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, indexBuffer);
-  gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, gridIndices, gl.STATIC_DRAW);
-  gl.bindVertexArray(null);
-
-  const contentTexture = gl.createTexture()!;
-  gl.bindTexture(gl.TEXTURE_2D, contentTexture);
-  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-  gl.texImage2D(
-    gl.TEXTURE_2D,
-    0,
-    gl.RGBA,
-    1,
-    1,
-    0,
-    gl.RGBA,
-    gl.UNSIGNED_BYTE,
-    new Uint8Array([0, 0, 0, 0]),
-  );
-
-  let contentMaxX = 1;
-  let hasTexture = false;
-
-  if (under && htmlInCanvas) under.style.visibility = "hidden";
-
-  let isCapturing = false;
-  capture = async () => {
-    if (isCapturing) return;
-    try {
-      if (sourceCtx && typeof sourceCtx.drawElementImage === "function") {
-        sourceCtx.reset();
-        sourceCtx.drawElementImage(content, 0, 0);
-        gl!.bindTexture(gl!.TEXTURE_2D, contentTexture);
-        gl!.texImage2D(
-          gl!.TEXTURE_2D,
-          0,
-          gl!.RGBA,
-          gl!.RGBA,
-          gl!.UNSIGNED_BYTE,
-          source,
-        );
-        sourceCtx.reset();
-        hasTexture = true;
-        wake();
-      } else {
-        isCapturing = true;
-        const canvas = await html2canvas(content, {
-          logging: false,
-          useCORS: true,
-          scale: 1.5,
-          backgroundColor: null,
-        });
-        gl!.bindTexture(gl!.TEXTURE_2D, contentTexture);
-        gl!.texImage2D(
-          gl!.TEXTURE_2D,
-          0,
-          gl!.RGBA,
-          gl!.RGBA,
-          gl!.UNSIGNED_BYTE,
-          canvas,
-        );
-        hasTexture = true;
-        isCapturing = false;
-        wake();
-      }
-    } catch (e) {
-      isCapturing = false;
-    }
-  };
-
-  function syncCanvasSize() {
-    const dpr = Math.min(window.devicePixelRatio || 1, 2);
-    const width = Math.max(1, Math.round(output.clientWidth * dpr));
-    const height = Math.max(1, Math.round(output.clientHeight * dpr));
-    if (output.width !== width || output.height !== height) {
-      output.width = width;
-      output.height = height;
-    }
-    contentMaxX = Math.min(
-      1,
-      Math.max(0.05, content.clientWidth / Math.max(output.clientWidth, 1)),
-    );
-    if (htmlInCanvas) {
-      const cssWidth = Math.max(1, Math.round(source.clientWidth));
-      const cssHeight = Math.max(1, Math.round(source.clientHeight));
-      if (source.width !== cssWidth * dpr || source.height !== cssHeight * dpr) {
-        source.width = cssWidth * dpr;
-        source.height = cssHeight * dpr;
-      }
-      if (typeof paintable.requestPaint === "function") {
-        paintable.requestPaint();
-      }
-    }
-  }
-
-  const peel = { a: 0, target: 0 };
-  const FAR = 1e4;
-  const pointer = { u: FAR, v: 0, su: FAR, sv: 0 };
-
-  let shineRgb: [number, number, number] = [1, 1, 1];
-  const probe = document.createElement("canvas");
-  probe.width = probe.height = 1;
-  const probeCtx = probe.getContext("2d", { willReadFrequently: true });
-
-  function syncShineColor() {
-    if (config.shineColor !== "auto") {
-      shineRgb = config.shineColor;
-      return;
-    }
-    let luminance = 1;
-    if (probeCtx) {
-      let el: Element | null = content;
-      while (el) {
-        const bg = getComputedStyle(el).backgroundColor;
-        if (bg && bg !== "transparent") {
-          probeCtx.clearRect(0, 0, 1, 1);
-          probeCtx.fillStyle = bg;
-          probeCtx.fillRect(0, 0, 1, 1);
-          const [r, g, b, a] = probeCtx.getImageData(0, 0, 1, 1).data;
-          if (a > 0) {
-            luminance = (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255;
-            break;
-          }
-        }
-        el = el.parentElement;
-      }
-    }
-    shineRgb = luminance > 0.5 ? [0, 0, 0] : [1, 1, 1];
-  }
-
-  const motionQuery = window.matchMedia("(prefers-reduced-motion: reduce)");
-  let reducedMotion = motionQuery.matches;
-
-  syncCanvasSize();
-  syncShineColor();
-
-  function render() {
-    if (under && hasTexture && under.style.visibility === "hidden") {
-      under.style.visibility = "";
-    }
-    const w = Math.max(output.clientWidth, 1);
-    const h = Math.max(output.clientHeight, 1);
-    const side = SIDE_INDEX[config.side] ?? 0;
-
-    gl!.bindFramebuffer(gl!.FRAMEBUFFER, null);
-    gl!.viewport(0, 0, output.width, output.height);
-    gl!.clearColor(0, 0, 0, 0);
-    gl!.clearDepth(1);
-    gl!.clear(gl!.COLOR_BUFFER_BIT | gl!.DEPTH_BUFFER_BIT);
-    gl!.enable(gl!.BLEND);
-    gl!.blendFunc(gl!.ONE, gl!.ONE_MINUS_SRC_ALPHA);
-
-    gl!.enable(gl!.DEPTH_TEST);
-    gl!.depthFunc(gl!.LEQUAL);
-    gl!.useProgram(sheet.program);
-    gl!.bindVertexArray(sheetVao);
-    gl!.activeTexture(gl!.TEXTURE0);
-    gl!.bindTexture(gl!.TEXTURE_2D, contentTexture);
-    gl!.uniform1i(sheet.uniforms.uContent, 0);
-    gl!.uniform2f(sheet.uniforms.uRes, w, h);
-    gl!.uniform1f(sheet.uniforms.uSide, side);
-    gl!.uniform1f(sheet.uniforms.uPeel, peel.a);
-    gl!.uniform1f(sheet.uniforms.uReveal, Math.max(config.reveal, 0));
-    gl!.uniform1f(sheet.uniforms.uCurl, Math.max(config.curl, 1));
-    gl!.uniform1f(sheet.uniforms.uBow, config.bow);
-    gl!.uniform1f(sheet.uniforms.uFocal, Math.max(config.perspective, 200));
-    gl!.uniform1f(sheet.uniforms.uShade, config.shade);
-    gl!.uniform1f(sheet.uniforms.uZone, Math.max(config.zone, 1));
-    gl!.uniform1f(sheet.uniforms.uBulge, Math.max(config.bulge, 0));
-    gl!.uniform1f(sheet.uniforms.uShine, Math.max(config.shine, 0));
-    gl!.uniform3f(
-      sheet.uniforms.uShineColor,
-      shineRgb[0],
-      shineRgb[1],
-      shineRgb[2],
-    );
-    gl!.uniform1f(sheet.uniforms.uCross, side < 1.5 ? h : w);
-    gl!.uniform1f(
-      sheet.uniforms.uSpan,
-      config.shineDistance > 0 ? config.shineDistance : side < 1.5 ? w : h,
-    );
-    gl!.uniform2f(sheet.uniforms.uPointer, pointer.su, pointer.sv);
-    gl!.uniform1f(sheet.uniforms.uMaxX, contentMaxX);
-    gl!.drawElements(gl!.TRIANGLES, gridIndices.length, gl!.UNSIGNED_INT, 0);
-    gl!.bindVertexArray(null);
-    gl!.disable(gl!.DEPTH_TEST);
-  }
-
-  function syncContentEvents() {
-    const A = peel.a;
-    const R = Math.max(config.curl * A, 0.001);
-    const c = A * config.reveal + R + Math.max(config.bulge, 0) * A;
-    const tailEnd = Math.max(c, 2 * c - Math.PI * R);
-    const blocked = A > 0.02 && pointer.u < tailEnd;
-    const next = blocked ? "none" : "auto";
-    if (content.style.pointerEvents !== next) {
-      content.style.pointerEvents = next;
-    }
-  }
-
-  let raf = 0;
-  let lastTime = performance.now();
-  let destroyed = false;
-  let running = false;
-  let visible = true;
-
-  function updateTarget() {
-    if (config.mode === "hover") {
-      const open = peel.target > 0.5;
-      const limit = open ? peel.a * config.reveal + config.zone : config.zone;
-      peel.target = pointer.u < limit ? 1 : 0;
-      return;
-    }
-    const span = Math.max(config.zone + peel.a * config.reveal, 1);
-    peel.target = Math.min(1, Math.max(0, 1 - pointer.u / span));
-  }
-
-  function frame(now: number) {
-    if (destroyed) return;
-    if (!visible) {
-      running = false;
-      return;
-    }
-    const delta = Math.min((now - lastTime) / 1000, 1 / 30);
-    lastTime = now;
-    const tau = Math.max(config.smoothing, 1e-4);
-    const k = reducedMotion ? 1 : 1 - Math.exp(-delta / tau);
-    const kp = reducedMotion ? 1 : 1 - Math.exp(-delta / (tau * 0.45));
-    pointer.su += (pointer.u - pointer.su) * kp;
-    pointer.sv += (pointer.v - pointer.sv) * kp;
-    updateTarget();
-    peel.a += (peel.target - peel.a) * k;
-    syncContentEvents();
-    render();
-    const settle = 0.5 / Math.max(config.reveal + config.curl, 1);
-    if (
-      Math.abs(peel.target - peel.a) < settle &&
-      Math.abs(pointer.u - pointer.su) < 0.5 &&
-      Math.abs(pointer.v - pointer.sv) < 0.5
-    ) {
-      peel.a = peel.target;
-      pointer.su = pointer.u;
-      pointer.sv = pointer.v;
-      running = false;
-      return;
-    }
-    raf = requestAnimationFrame(frame);
-  }
-
-  function start() {
-    if (destroyed || running || !visible) return;
-    running = true;
-    capture();
-    lastTime = performance.now();
-    raf = requestAnimationFrame(frame);
-  }
-
-  wake = start;
-  start();
-
-  function onMotionChange() {
-    reducedMotion = motionQuery.matches;
-    start();
-  }
-  motionQuery.addEventListener("change", onMotionChange);
-
-  let themeTimer = 0;
-  function onThemeShift() {
-    syncShineColor();
-    start();
-    window.clearTimeout(themeTimer);
-    themeTimer = window.setTimeout(() => {
-      syncShineColor();
-      start();
-    }, 300);
-  }
-
-  const themeObserver = new MutationObserver(onThemeShift);
-  themeObserver.observe(document.documentElement, {
-    attributes: true,
-    attributeFilter: ["class", "style", "data-theme"],
-  });
-  const schemeQuery = window.matchMedia("(prefers-color-scheme: dark)");
-  schemeQuery.addEventListener("change", onThemeShift);
-
-  const observer = new ResizeObserver(() => {
-    syncCanvasSize();
-    start();
-  });
-  observer.observe(output);
-  observer.observe(content);
-
-  const intersection = new IntersectionObserver((entries) => {
-    visible = entries[entries.length - 1]?.isIntersecting ?? true;
-    if (visible) start();
-  });
-  intersection.observe(output);
-
-  const listenTarget = output.parentElement ?? output;
-
-  function sideDistance(x: number, y: number, rect: DOMRect): number {
-    if (config.side === "right") return rect.width - x;
-    if (config.side === "top") return y;
-    if (config.side === "bottom") return rect.height - y;
-    return x;
-  }
-
-  function onPointerMove(event: PointerEvent) {
-    if (!htmlInCanvas) return;
-    const rect = output.getBoundingClientRect();
-    const x = event.clientX - rect.left;
-    const y = event.clientY - rect.top;
-    pointer.u = sideDistance(x, y, rect);
-    pointer.v = config.side === "top" || config.side === "bottom" ? x : y;
-    updateTarget();
-    start();
-  }
-
-  function onPointerLeave() {
-    pointer.u = FAR;
-    peel.target = 0;
-    start();
-  }
-
-  listenTarget.addEventListener("pointermove", onPointerMove);
-  listenTarget.addEventListener("pointerleave", onPointerLeave);
-
-  return {
-    setOptions(next) {
-      if (
-        !Object.entries(next).some(
-          ([key, value]) => config[key as keyof PeelOptions] !== value,
-        )
-      )
-        return;
-      Object.assign(config, next);
-      syncShineColor();
-      start();
-    },
-    resize() {
-      syncCanvasSize();
-      start();
-    },
-    destroy() {
-      destroyed = true;
-      cancelAnimationFrame(raf);
-      observer.disconnect();
-      intersection.disconnect();
-      themeObserver.disconnect();
-      schemeQuery.removeEventListener("change", onThemeShift);
-      window.clearTimeout(themeTimer);
-      motionQuery.removeEventListener("change", onMotionChange);
-      listenTarget.removeEventListener("pointermove", onPointerMove);
-      listenTarget.removeEventListener("pointerleave", onPointerLeave);
-      content.style.pointerEvents = "";
-      if (under) under.style.visibility = "";
-      gl!.deleteTexture(contentTexture);
-      gl!.deleteProgram(sheet.program);
-      gl!.deleteShader(sheet.vert);
-      gl!.deleteShader(sheet.frag);
-      gl!.deleteBuffer(gridBuffer);
-      gl!.deleteBuffer(indexBuffer);
-      gl!.deleteVertexArray(sheetVao);
-      if (htmlInCanvas) paintable.onpaint = null;
-    },
-  };
-}
-
 export interface PeelProps extends PeelOptions {
-  /** The content that peels away. */
   children: ReactNode;
-  /** The content revealed underneath the peel. */
   under?: ReactNode;
   className?: string;
   style?: React.CSSProperties;
 }
-
-const emptySubscribe = () => () => {};
 
 export function Peel({
   children,
@@ -678,107 +165,368 @@ export function Peel({
   style,
   ...options
 }: PeelProps) {
-  // Always use the robust CSS fallback to prevent WebGL blackscreen and ensure 100% compatibility
-  const native = false;
-  const [isHovered, setIsHovered] = useState(false);
+  const config = { ...DEFAULTS, ...options };
+  
+  const containerRef = useRef<HTMLDivElement>(null);
+  const contentRef = useRef<HTMLDivElement>(null);
+  const outputRef = useRef<HTMLCanvasElement>(null);
+  const underRef = useRef<HTMLDivElement>(null);
+
+  const glRef = useRef<WebGL2RenderingContext | null>(null);
+  const progInfoRef = useRef<any>(null);
+  const vaoRef = useRef<WebGLVertexArrayObject | null>(null);
+  const texRef = useRef<WebGLTexture | null>(null);
+  
+  const [isReady, setIsReady] = useState(false);
+  const location = useLocation();
+  
+  const peelRef = useRef({ a: 0, target: 0 });
+  const FAR = 1e4;
+  const pointerRef = useRef({ u: FAR, v: 0, su: FAR, sv: 0 });
+  const rafRef = useRef(0);
+  const contentMaxXRef = useRef(1);
+  const shineRgbRef = useRef<[number, number, number]>([1, 1, 1]);
+
+  useEffect(() => {
+    const canvas = outputRef.current;
+    if (!canvas) return;
+
+    const gl = canvas.getContext("webgl2", {
+      alpha: true,
+      depth: true,
+      antialias: true,
+      premultipliedAlpha: true,
+    });
+    if (!gl) return;
+    glRef.current = gl;
+
+    function compile(type: number, src: string) {
+      const s = gl!.createShader(type)!;
+      gl!.shaderSource(s, src);
+      gl!.compileShader(s);
+      return s;
+    }
+
+    const vert = compile(gl.VERTEX_SHADER, SHEET_VERT);
+    const frag = compile(gl.FRAGMENT_SHADER, SHEET_FRAG);
+    const prog = gl.createProgram()!;
+    gl.attachShader(prog, vert);
+    gl.attachShader(prog, frag);
+    gl.linkProgram(prog);
+
+    const uniforms: Record<string, WebGLUniformLocation> = {};
+    const count = gl.getProgramParameter(prog, gl.ACTIVE_UNIFORMS);
+    for (let i = 0; i < count; i++) {
+      const info = gl.getActiveUniform(prog, i)!;
+      uniforms[info.name] = gl.getUniformLocation(prog, info.name)!;
+    }
+    progInfoRef.current = { program: prog, uniforms };
+
+    const gridVerts = new Float32Array((SEG + 1) * (SEG + 1) * 2);
+    for (let y = 0; y <= SEG; y++) {
+      for (let x = 0; x <= SEG; x++) {
+        const i = (y * (SEG + 1) + x) * 2;
+        gridVerts[i] = x / SEG;
+        gridVerts[i + 1] = y / SEG;
+      }
+    }
+    const gridIndices = new Uint32Array(SEG * SEG * 6);
+    let offset = 0;
+    for (let y = 0; y < SEG; y++) {
+      for (let x = 0; x < SEG; x++) {
+        const a = y * (SEG + 1) + x;
+        const b = a + 1;
+        const c = a + SEG + 1;
+        const d = c + 1;
+        gridIndices[offset++] = a;
+        gridIndices[offset++] = c;
+        gridIndices[offset++] = b;
+        gridIndices[offset++] = b;
+        gridIndices[offset++] = c;
+        gridIndices[offset++] = d;
+      }
+    }
+
+    const vao = gl.createVertexArray()!;
+    gl.bindVertexArray(vao);
+    const gb = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, gb);
+    gl.bufferData(gl.ARRAY_BUFFER, gridVerts, gl.STATIC_DRAW);
+    gl.enableVertexAttribArray(0);
+    gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
+    const ib = gl.createBuffer();
+    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, ib);
+    gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, gridIndices, gl.STATIC_DRAW);
+    gl.bindVertexArray(null);
+    vaoRef.current = vao;
+
+    const tex = gl.createTexture()!;
+    gl.bindTexture(gl.TEXTURE_2D, tex);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array([0, 0, 0, 0]));
+    texRef.current = tex;
+
+    return () => cancelAnimationFrame(rafRef.current);
+  }, []);
+
+  const captureContent = useCallback(() => {
+    const content = contentRef.current;
+    const gl = glRef.current;
+    if (!content || !gl) return;
+    
+    toCanvas(content, {
+      pixelRatio: Math.min(window.devicePixelRatio || 1, 2),
+      skipAutoScale: true,
+      style: {
+        opacity: "1",
+        pointerEvents: "auto"
+      }
+    }).then(canvas => {
+      gl.bindTexture(gl.TEXTURE_2D, texRef.current);
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, canvas);
+      contentMaxXRef.current = Math.min(1, Math.max(0.05, content.clientWidth / Math.max(outputRef.current?.clientWidth || 1, 1)));
+      setIsReady(true);
+      wake();
+    }).catch(err => {
+      console.error("html-to-image failed to render canvas:", err);
+      // Fallback: if it fails, make sure content is visible
+      setIsReady(false);
+      if (contentRef.current) {
+        contentRef.current.style.opacity = "1";
+        contentRef.current.style.pointerEvents = "auto";
+      }
+    });
+  }, []);
+
+  useEffect(() => {
+    let timeout: ReturnType<typeof setTimeout>;
+
+    // Initial capture
+    captureContent();
+
+    const ro = new ResizeObserver(() => captureContent());
+    if (contentRef.current) ro.observe(contentRef.current);
+
+    // Watch for actual DOM insertions/deletions (like route transitions completing)
+    const mo = new MutationObserver((mutations) => {
+      const hasStructuralChanges = mutations.some(m => m.type === 'childList' && m.addedNodes.length > 0);
+      if (hasStructuralChanges) {
+        clearTimeout(timeout);
+        timeout = setTimeout(() => {
+          captureContent();
+        }, 150);
+      }
+    });
+
+    if (contentRef.current) {
+      mo.observe(contentRef.current, { childList: true, subtree: true });
+    }
+
+    return () => {
+      ro.disconnect();
+      mo.disconnect();
+      clearTimeout(timeout);
+    };
+  }, [captureContent]);
+
+  const wake = useCallback(() => {
+    cancelAnimationFrame(rafRef.current);
+    let last = performance.now();
+
+    const frame = (now: number) => {
+      const dt = Math.min((now - last) / 1000, 1 / 30);
+      last = now;
+      
+      const tau = Math.max(config.smoothing, 1e-4);
+      const k = 1 - Math.exp(-dt / tau);
+      const kp = 1 - Math.exp(-dt / (tau * 0.45));
+      
+      const p = pointerRef.current;
+      p.su += (p.u - p.su) * kp;
+      p.sv += (p.v - p.sv) * kp;
+
+      const peel = peelRef.current;
+
+      peel.a += (peel.target - peel.a) * k;
+
+      const A = peel.a;
+      const R = Math.max(config.curl * A, 0.001);
+      const c = A * config.reveal + R + Math.max(config.bulge, 0) * A;
+      const tailEnd = Math.max(c, 2 * c - Math.PI * R);
+      const blocked = A > 0.02 && p.u < tailEnd;
+      if (contentRef.current) {
+        contentRef.current.style.opacity = blocked || A > 0.01 ? "0" : "1";
+        contentRef.current.style.pointerEvents = blocked ? "none" : "auto";
+      }
+
+      if (outputRef.current) {
+        outputRef.current.style.visibility = A > 0.01 ? "visible" : "hidden";
+      }
+
+      render();
+
+      const settle = 0.5 / Math.max(config.reveal + config.curl, 1);
+      if (
+        Math.abs(peel.target - peel.a) < settle &&
+        Math.abs(p.u - p.su) < 0.5 &&
+        Math.abs(p.v - p.sv) < 0.5
+      ) {
+        peel.a = peel.target;
+        p.su = p.u;
+        p.sv = p.v;
+        return;
+      }
+      rafRef.current = requestAnimationFrame(frame);
+    };
+    rafRef.current = requestAnimationFrame(frame);
+  }, [config]);
+
+  const render = () => {
+    const gl = glRef.current;
+    const prog = progInfoRef.current;
+    const output = outputRef.current;
+    if (!gl || !prog || !output) return;
+
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    const w = Math.max(1, Math.round(output.clientWidth * dpr));
+    const h = Math.max(1, Math.round(output.clientHeight * dpr));
+    if (output.width !== w || output.height !== h) {
+      output.width = w;
+      output.height = h;
+    }
+
+    const side = SIDE_INDEX[config.side] ?? 0;
+    const peel = peelRef.current;
+    const p = pointerRef.current;
+
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    gl.viewport(0, 0, output.width, output.height);
+    gl.clearColor(0, 0, 0, 0);
+    gl.clearDepth(1);
+    gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+    gl.enable(gl.BLEND);
+    gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
+    gl.enable(gl.DEPTH_TEST);
+    gl.depthFunc(gl.LEQUAL);
+    
+    gl.useProgram(prog.program);
+    gl.bindVertexArray(vaoRef.current);
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_2D, texRef.current);
+    
+    gl.uniform1i(prog.uniforms.uContent, 0);
+    gl.uniform2f(prog.uniforms.uRes, output.clientWidth, output.clientHeight);
+    gl.uniform1f(prog.uniforms.uSide, side);
+    gl.uniform1f(prog.uniforms.uPeel, peel.a);
+    gl.uniform1f(prog.uniforms.uReveal, Math.max(config.reveal, 0));
+    gl.uniform1f(prog.uniforms.uCurl, Math.max(config.curl, 1));
+    gl.uniform1f(prog.uniforms.uBow, config.bow);
+    gl.uniform1f(prog.uniforms.uFocal, Math.max(config.perspective, 200));
+    gl.uniform1f(prog.uniforms.uShade, config.shade);
+    gl.uniform1f(prog.uniforms.uZone, Math.max(config.zone, 1));
+    gl.uniform1f(prog.uniforms.uBulge, Math.max(config.bulge, 0));
+    gl.uniform1f(prog.uniforms.uShine, Math.max(config.shine, 0));
+    gl.uniform3f(prog.uniforms.uShineColor, 1, 1, 1);
+    gl.uniform1f(prog.uniforms.uCross, side < 1.5 ? output.clientHeight : output.clientWidth);
+    gl.uniform1f(prog.uniforms.uSpan, config.shineDistance > 0 ? config.shineDistance : (side < 1.5 ? output.clientWidth : output.clientHeight));
+    gl.uniform2f(prog.uniforms.uPointer, p.su, p.sv);
+    gl.uniform1f(prog.uniforms.uMaxX, contentMaxXRef.current);
+    
+    gl.drawElements(gl.TRIANGLES, SEG * SEG * 6, gl.UNSIGNED_INT, 0);
+    gl.bindVertexArray(null);
+    gl.disable(gl.DEPTH_TEST);
+  };
+
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const onMove = (e: PointerEvent) => {
+      const rect = el.getBoundingClientRect();
+      const x = e.clientX - rect.left;
+      const y = e.clientY - rect.top;
+      
+      const p = pointerRef.current;
+      const peel = peelRef.current;
+
+      p.targetU = x;
+      p.targetV = y;
+      
+      const isOpen = peel.target === 1;
+      const openLine = 100;
+      const closeLine = 150;
+
+      if (!isOpen && x < openLine) {
+        peel.target = 1; // Open peel
+      } else if (isOpen && x > closeLine) {
+        peel.target = 0; // Close peel
+      }
+      
+      p.u = config.side === "right" ? rect.width - x : config.side === "top" ? y : config.side === "bottom" ? rect.height - y : x;
+      p.v = config.side === "top" || config.side === "bottom" ? x : y;
+      wake();
+    };
+    const onLeave = () => {
+      const p = pointerRef.current;
+      const peel = peelRef.current;
+      peel.target = 0;
+      p.u = FAR;
+      wake();
+    };
+    const p = pointerRef.current;
+    el.addEventListener("pointermove", onMove);
+    el.addEventListener("pointerleave", onLeave);
+    return () => {
+      el.removeEventListener("pointermove", onMove);
+      el.removeEventListener("pointerleave", onLeave);
+    };
+  }, [config.side, wake]);
 
   return (
-    <div 
-      className={className} 
-      style={{ 
-        position: "relative", 
-        display: "flex", 
-        overflow: "hidden", 
-        minHeight: "100vh", 
-        backgroundColor: "#020617",
-        ...style 
-      }}
-      onMouseLeave={() => setIsHovered(false)}
-    >
-      {/* Hover trigger zone on the left edge */}
-      <div 
-        style={{
-          position: "absolute",
-          left: 0,
-          top: 0,
-          bottom: 0,
-          width: "50px",
-          zIndex: 100,
-          cursor: "pointer"
-        }}
-        onMouseEnter={() => setIsHovered(true)}
-      />
-
-      {/* Sidebar (revealed under the curl) */}
+    <div ref={containerRef} className={className} style={{ position: "relative", ...style }}>
+      {/* ── Under layer ── */}
       <div
+        ref={underRef}
         style={{
           position: "absolute",
-          left: 0,
-          top: 0,
-          bottom: 0,
-          width: "260px",
-          zIndex: 10,
-          opacity: isHovered ? 1 : 0,
-          transform: isHovered ? "translateX(0)" : "translateX(-30px)",
-          transition: "transform 0.5s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.5s cubic-bezier(0.16, 1, 0.3, 1)",
+          inset: 0,
+          overflow: "hidden",
+          visibility: isReady ? "visible" : "hidden",
         }}
       >
         {under}
       </div>
-
-      {/* Main Content Area (Peeled sheet) */}
+      
+      {/* ── Content (hidden visually when peeled, but captures events) ── */}
       <div
+        ref={contentRef}
         style={{
-          flex: 1,
-          width: "100%",
-          minHeight: "100vh",
           position: "relative",
-          zIndex: 20,
-          backgroundColor: "#090d16",
-          transform: isHovered ? "translateX(260px)" : "translateX(0)",
-          // Simulating page curl using border-radius and clip-path for a realistic paper edge
-          borderTopLeftRadius: isHovered ? "24px 50%" : "0px",
-          borderBottomLeftRadius: isHovered ? "24px 50%" : "0px",
-          boxShadow: isHovered 
-            ? "-25px 0 50px -10px rgba(0, 0, 0, 0.9), -10px 0 20px -5px rgba(0, 0, 0, 0.7)" 
-            : "none",
-          transition: "transform 0.5s cubic-bezier(0.16, 1, 0.3, 1), border-radius 0.5s ease, box-shadow 0.5s ease",
-          overflow: "hidden",
+          width: "100%",
+          height: "100%",
+          overflowY: "auto",
+          overflowX: "hidden",
+          pointerEvents: "auto",
         }}
       >
-        {/* Curled Page Edge Shading overlay */}
-        <div
-          style={{
-            position: "absolute",
-            left: 0,
-            top: 0,
-            bottom: 0,
-            width: "40px",
-            pointerEvents: "none",
-            background: "linear-gradient(to right, rgba(0, 0, 0, 0.4) 0%, rgba(255, 255, 255, 0.05) 40%, rgba(0, 0, 0, 0) 100%)",
-            opacity: isHovered ? 1 : 0,
-            transition: "opacity 0.5s ease",
-            zIndex: 30,
-          }}
-        />
         {children}
       </div>
 
-      {/* Overlay to close sidebar on click or hover out */}
-      {isHovered && (
-        <div
-          style={{
-            position: "absolute",
-            inset: 0,
-            left: "260px",
-            backgroundColor: "rgba(0, 0, 0, 0.2)",
-            backdropFilter: "blur(1px)",
-            zIndex: 45,
-          }}
-          onMouseEnter={() => setIsHovered(false)}
-          onClick={() => setIsHovered(false)}
-        />
-      )}
+      {/* ── WebGL Peel Output ── */}
+      <canvas
+        ref={outputRef}
+        aria-hidden
+        style={{
+          position: "absolute",
+          inset: 0,
+          width: "100%",
+          height: "100%",
+          pointerEvents: "none",
+          display: isReady ? "block" : "none"
+        }}
+      />
     </div>
   );
 }

@@ -11,22 +11,40 @@ export const SpreadsheetView: React.FC<SpreadsheetViewProps> = ({
   transactions,
   onOpenNewTransactionModal,
 }) => {
-  const [currentMonth, setCurrentMonth] = useState('Jul 2026');
+  const [currentDate, setCurrentDate] = useState(new Date());
 
-  // Hardcoded spreadsheet rows matching the screenshot + live dynamic entries
-  const spreadsheetData = [
-    { date: '30 Jul', description: 'Client Payment', income: 15000, expense: null, balance: 55651 },
-    { date: '30 Jul', description: 'Tea at Chai Corner', income: null, expense: 30, balance: 55621 },
-    { date: '30 Jul', description: 'Auto Fare', income: null, expense: 120, balance: 55501 },
-    { date: '29 Jul', description: 'Freelance Work', income: 4500, expense: null, balance: 55621 },
-    { date: '29 Jul', description: 'Petrol Pump', income: null, expense: 2000, balance: 53621 },
-    { date: '29 Jul', description: 'Lunch', income: null, expense: 150, balance: 53471 },
-    { date: '29 Jul', description: 'Office Supplies', income: null, expense: 1300, balance: 52171 },
-  ];
+  const handlePrevMonth = () => {
+    setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1));
+  };
+  
+  const handleNextMonth = () => {
+    setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 1));
+  };
 
-  const totalIncome = spreadsheetData.reduce((acc, row) => acc + (row.income || 0), 0);
-  const totalExpense = spreadsheetData.reduce((acc, row) => acc + (row.expense || 0), 0);
-  const finalBalance = 52171;
+  const currentMonthDisplay = currentDate.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+  const currentMonthStr = currentDate.toISOString().slice(0, 7); // e.g. "2026-07"
+
+  // Sort chronologically to compute running balance
+  const sortedTx = [...transactions].sort((a, b) => a.date.localeCompare(b.date));
+  
+  let balance = 0;
+  const txWithBalance = sortedTx.map(t => {
+    if (t.type === 'income') balance += t.amount;
+    else balance -= t.amount;
+    return { ...t, balance };
+  });
+
+  // Filter for the selected month
+  const monthTx = txWithBalance.filter(t => t.date.startsWith(currentMonthStr));
+  
+  // Show newest first in grid
+  monthTx.reverse();
+
+  const totalIncome = monthTx.reduce((acc, row) => acc + (row.type === 'income' ? row.amount : 0), 0);
+  const totalExpense = monthTx.reduce((acc, row) => acc + (row.type === 'expense' ? row.amount : 0), 0);
+  const finalBalance = monthTx.length > 0 
+    ? monthTx[0].balance 
+    : (txWithBalance.filter(t => t.date < currentMonthStr).pop()?.balance || 0);
 
   return (
     <div className="space-y-6 pb-12 text-white">
@@ -45,14 +63,14 @@ export const SpreadsheetView: React.FC<SpreadsheetViewProps> = ({
         {/* Date Month Selector */}
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-2 bg-slate-950 px-3 py-1.5 rounded-xl border border-slate-800 text-xs font-mono">
-            <button className="hover:text-emerald-400 cursor-pointer">
+            <button onClick={handlePrevMonth} className="hover:text-emerald-400 cursor-pointer">
               <ChevronLeft className="w-4 h-4" />
             </button>
             <span className="flex items-center gap-1.5 text-slate-200">
               <Calendar className="w-3.5 h-3.5 text-emerald-400" />
-              {currentMonth}
+              {currentMonthDisplay}
             </span>
-            <button className="hover:text-emerald-400 cursor-pointer">
+            <button onClick={handleNextMonth} className="hover:text-emerald-400 cursor-pointer">
               <ChevronRight className="w-4 h-4" />
             </button>
           </div>
@@ -83,21 +101,30 @@ export const SpreadsheetView: React.FC<SpreadsheetViewProps> = ({
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-800/80">
-              {spreadsheetData.map((row, idx) => (
+              {monthTx.map((row, idx) => (
                 <tr key={idx} className="hover:bg-slate-800/50 transition-colors">
-                  <td className="p-3.5 text-slate-400 border-r border-slate-800/60 whitespace-nowrap">{row.date}</td>
+                  <td className="p-3.5 text-slate-400 border-r border-slate-800/60 whitespace-nowrap">
+                    {new Date(row.date).toLocaleDateString('en-US', { day: '2-digit', month: 'short' })}
+                  </td>
                   <td className="p-3.5 font-sans font-medium text-white border-r border-slate-800/60">{row.description}</td>
                   <td className="p-3.5 text-right font-bold text-emerald-400 border-r border-slate-800/60">
-                    {row.income ? row.income.toLocaleString() : '-'}
+                    {row.type === 'income' ? row.amount.toLocaleString() : '-'}
                   </td>
                   <td className="p-3.5 text-right font-bold text-rose-400 border-r border-slate-800/60">
-                    {row.expense ? row.expense.toLocaleString() : '-'}
+                    {row.type === 'expense' ? row.amount.toLocaleString() : '-'}
                   </td>
                   <td className="p-3.5 text-right font-bold text-slate-200">
                     {row.balance.toLocaleString()}
                   </td>
                 </tr>
               ))}
+              {monthTx.length === 0 && (
+                <tr>
+                  <td colSpan={5} className="p-8 text-center text-slate-500">
+                    No entries found for {currentMonthDisplay}.
+                  </td>
+                </tr>
+              )}
             </tbody>
             <tfoot>
               <tr className="bg-slate-950 border-t-2 border-slate-800 font-bold">
