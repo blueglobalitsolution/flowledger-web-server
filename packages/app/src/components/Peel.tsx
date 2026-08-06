@@ -5,6 +5,7 @@ import React, {
   useSyncExternalStore,
   type ReactNode,
 } from "react";
+import html2canvas from "html2canvas";
 
 export type PeelSide = "left" | "right" | "top" | "bottom";
 
@@ -219,11 +220,7 @@ export function createPeel(
 
   const sourceCtx = source.getContext("2d") as ElementImageContext | null;
   const paintable = source as PaintableCanvas;
-  const htmlInCanvas = Boolean(
-    sourceCtx &&
-    typeof sourceCtx.drawElementImage === "function" &&
-    typeof paintable.requestPaint === "function",
-  );
+  const htmlInCanvas = true;
 
   let wake = () => {};
   let capture = () => {};
@@ -320,24 +317,49 @@ export function createPeel(
 
   if (under && htmlInCanvas) under.style.visibility = "hidden";
 
-  capture = () => {
-    if (!htmlInCanvas) return;
+  let isCapturing = false;
+  capture = async () => {
+    if (isCapturing) return;
     try {
-      sourceCtx!.reset();
-      sourceCtx!.drawElementImage!(content, 0, 0);
-      gl!.bindTexture(gl!.TEXTURE_2D, contentTexture);
-      gl!.texImage2D(
-        gl!.TEXTURE_2D,
-        0,
-        gl!.RGBA,
-        gl!.RGBA,
-        gl!.UNSIGNED_BYTE,
-        source,
-      );
-      sourceCtx!.reset();
-      hasTexture = true;
-      wake();
-    } catch {}
+      if (sourceCtx && typeof sourceCtx.drawElementImage === "function") {
+        sourceCtx.reset();
+        sourceCtx.drawElementImage(content, 0, 0);
+        gl!.bindTexture(gl!.TEXTURE_2D, contentTexture);
+        gl!.texImage2D(
+          gl!.TEXTURE_2D,
+          0,
+          gl!.RGBA,
+          gl!.RGBA,
+          gl!.UNSIGNED_BYTE,
+          source,
+        );
+        sourceCtx.reset();
+        hasTexture = true;
+        wake();
+      } else {
+        isCapturing = true;
+        const canvas = await html2canvas(content, {
+          logging: false,
+          useCORS: true,
+          scale: 1.5,
+          backgroundColor: null,
+        });
+        gl!.bindTexture(gl!.TEXTURE_2D, contentTexture);
+        gl!.texImage2D(
+          gl!.TEXTURE_2D,
+          0,
+          gl!.RGBA,
+          gl!.RGBA,
+          gl!.UNSIGNED_BYTE,
+          canvas,
+        );
+        hasTexture = true;
+        isCapturing = false;
+        wake();
+      }
+    } catch (e) {
+      isCapturing = false;
+    }
   };
 
   function syncCanvasSize() {
@@ -359,7 +381,9 @@ export function createPeel(
         source.width = cssWidth * dpr;
         source.height = cssHeight * dpr;
       }
-      paintable.requestPaint!();
+      if (typeof paintable.requestPaint === "function") {
+        paintable.requestPaint();
+      }
     }
   }
 
@@ -520,6 +544,7 @@ export function createPeel(
   function start() {
     if (destroyed || running || !visible) return;
     running = true;
+    capture();
     lastTime = performance.now();
     raf = requestAnimationFrame(frame);
   }
@@ -653,112 +678,107 @@ export function Peel({
   style,
   ...options
 }: PeelProps) {
-  const sourceRef = useRef<HTMLCanvasElement>(null);
-  const contentRef = useRef<HTMLDivElement>(null);
-  const outputRef = useRef<HTMLCanvasElement>(null);
-  const underRef = useRef<HTMLDivElement>(null);
-  const instanceRef = useRef<PeelInstance | null>(null);
-  const [initialOptions] = useState(options);
-  const [failed, setFailed] = useState(false);
-
-  const supported = useSyncExternalStore(
-    emptySubscribe,
-    supportsHtmlInCanvas,
-    () => false,
-  );
-  const native = supported && !failed;
-
-  useEffect(() => {
-    const source = sourceRef.current;
-    const content = contentRef.current;
-    const output = outputRef.current;
-    if (!source || !content || !output) return;
-    instanceRef.current = createPeel(
-      { source, content, output, under: underRef.current ?? undefined },
-      initialOptions,
-    );
-    if (native && !instanceRef.current) setFailed(true);
-    return () => {
-      instanceRef.current?.destroy();
-      instanceRef.current = null;
-    };
-  }, [initialOptions, native]);
-
-  useEffect(() => {
-    instanceRef.current?.setOptions(options);
-  });
+  // Always use the robust CSS fallback to prevent WebGL blackscreen and ensure 100% compatibility
+  const native = false;
+  const [isHovered, setIsHovered] = useState(false);
 
   return (
-    <div className={className} style={{ position: "relative", ...style }}>
-      {native ? (
+    <div 
+      className={className} 
+      style={{ 
+        position: "relative", 
+        display: "flex", 
+        overflow: "hidden", 
+        minHeight: "100vh", 
+        backgroundColor: "#020617",
+        ...style 
+      }}
+      onMouseLeave={() => setIsHovered(false)}
+    >
+      {/* Hover trigger zone on the left edge */}
+      <div 
+        style={{
+          position: "absolute",
+          left: 0,
+          top: 0,
+          bottom: 0,
+          width: "50px",
+          zIndex: 100,
+          cursor: "pointer"
+        }}
+        onMouseEnter={() => setIsHovered(true)}
+      />
+
+      {/* Sidebar (revealed under the curl) */}
+      <div
+        style={{
+          position: "absolute",
+          left: 0,
+          top: 0,
+          bottom: 0,
+          width: "260px",
+          zIndex: 10,
+          opacity: isHovered ? 1 : 0,
+          transform: isHovered ? "translateX(0)" : "translateX(-30px)",
+          transition: "transform 0.5s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.5s cubic-bezier(0.16, 1, 0.3, 1)",
+        }}
+      >
+        {under}
+      </div>
+
+      {/* Main Content Area (Peeled sheet) */}
+      <div
+        style={{
+          flex: 1,
+          width: "100%",
+          minHeight: "100vh",
+          position: "relative",
+          zIndex: 20,
+          backgroundColor: "#090d16",
+          transform: isHovered ? "translateX(260px)" : "translateX(0)",
+          // Simulating page curl using border-radius and clip-path for a realistic paper edge
+          borderTopLeftRadius: isHovered ? "24px 50%" : "0px",
+          borderBottomLeftRadius: isHovered ? "24px 50%" : "0px",
+          boxShadow: isHovered 
+            ? "-25px 0 50px -10px rgba(0, 0, 0, 0.9), -10px 0 20px -5px rgba(0, 0, 0, 0.7)" 
+            : "none",
+          transition: "transform 0.5s cubic-bezier(0.16, 1, 0.3, 1), border-radius 0.5s ease, box-shadow 0.5s ease",
+          overflow: "hidden",
+        }}
+      >
+        {/* Curled Page Edge Shading overlay */}
         <div
-          ref={underRef}
+          style={{
+            position: "absolute",
+            left: 0,
+            top: 0,
+            bottom: 0,
+            width: "40px",
+            pointerEvents: "none",
+            background: "linear-gradient(to right, rgba(0, 0, 0, 0.4) 0%, rgba(255, 255, 255, 0.05) 40%, rgba(0, 0, 0, 0) 100%)",
+            opacity: isHovered ? 1 : 0,
+            transition: "opacity 0.5s ease",
+            zIndex: 30,
+          }}
+        />
+        {children}
+      </div>
+
+      {/* Overlay to close sidebar on click or hover out */}
+      {isHovered && (
+        <div
           style={{
             position: "absolute",
             inset: 0,
-            overflow: "hidden",
-            visibility: "hidden",
+            left: "260px",
+            backgroundColor: "rgba(0, 0, 0, 0.2)",
+            backdropFilter: "blur(1px)",
+            zIndex: 45,
           }}
-        >
-          {under}
-        </div>
-      ) : null}
-      <canvas
-        ref={sourceRef}
-        // @ts-expect-error experimental html-in-canvas attribute
-        layoutsubtree="true"
-        suppressHydrationWarning
-        style={
-          native
-            ? {
-                position: "absolute",
-                inset: 0,
-                width: "100%",
-                height: "100%",
-                pointerEvents: "none",
-              }
-            : { display: "none" }
-        }
-      >
-        {native ? (
-          <div
-            ref={contentRef}
-            style={{
-              position: "relative",
-              width: "100%",
-              height: "100%",
-              overflow: "hidden",
-              pointerEvents: "auto",
-            }}
-          >
-            {children}
-          </div>
-        ) : null}
-      </canvas>
-      {!native ? (
-        <div
-          ref={contentRef}
-          style={{
-            position: "relative",
-            width: "100%",
-            height: "100%",
-            overflow: "hidden",
-          }}
-        >
-          {children}
-        </div>
-      ) : null}
-      <canvas
-        ref={outputRef}
-        aria-hidden
-        style={{
-          position: "absolute",
-          inset: 0,
-          width: "100%",
-          height: "100%",
-          pointerEvents: "none",
-        }}
-      />
+          onMouseEnter={() => setIsHovered(false)}
+          onClick={() => setIsHovered(false)}
+        />
+      )}
     </div>
   );
 }

@@ -1,6 +1,4 @@
 import React, { useEffect, useState } from 'react';
-import { Navbar } from './components/Navbar';
-import { NavigationTabs } from './components/NavigationTabs';
 import { DashboardView } from './components/DashboardView';
 import { AIEngineSandboxView } from './components/AIEngineSandboxView';
 import { TransactionsView } from './components/TransactionsView';
@@ -11,6 +9,8 @@ import { AccountsView } from './components/AccountsView';
 import { AIParsingModal } from './components/AIParsingModal';
 import { TransactionFormModal } from './components/TransactionFormModal';
 import { LoginView } from './components/LoginView';
+import { Peel } from './components/Peel';
+import { Sidebar } from './components/Sidebar';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 
 import { AVAILABLE_AI_ENGINES } from '@shared/mockData';
@@ -258,192 +258,190 @@ export default function App() {
     await refreshData();
   };
 
+  if (!currentUser) {
+    return (
+      <BrowserRouter>
+        <Routes>
+          <Route path="/login" element={
+            <LoginView onLogin={(user) => {
+              setCurrentUser(user);
+              window.location.href = '/dashboard';
+            }} />
+          } />
+          <Route path="*" element={<Navigate to="/login" replace />} />
+        </Routes>
+      </BrowserRouter>
+    );
+  }
+
   return (
     <BrowserRouter>
-      <div id="flowledger-root" className="min-h-screen bg-slate-950 text-slate-100 font-sans selection:bg-emerald-500 selection:text-slate-950 flex flex-col">
-        {currentUser && (
-          <Navbar
-            activeEngine={activeEngine}
-            quickParseCount={transactions.filter((t) => t.ai_parsed).length}
-            currentUser={currentUser}
-            lastSyncedAt={lastSyncedAt}
-            onLogout={handleLogout}
-          />
-        )}
+      <Peel
+        side="left"
+        mode="cursor"
+        reveal={260}
+        zone={180}
+        className="w-full min-h-screen"
+        under={<Sidebar currentUser={currentUser} onLogout={handleLogout} />}
+      >
+        <div id="flowledger-root" className="min-h-screen bg-slate-950 text-slate-100 font-sans selection:bg-emerald-500 selection:text-slate-950 flex flex-col">
+          {/* Main View Container */}
+          <main className="flex-1 w-full mx-auto px-6 py-8">
+            {isLoading && (
+              <div className="flex items-center justify-center py-24 text-slate-400 text-sm animate-pulse">
+                Loading from database...
+              </div>
+            )}
+            
+            <Routes>
+              <Route path="/login" element={<Navigate to="/dashboard" replace />} />
+              <Route path="/" element={<Navigate to="/dashboard" replace />} />
+              
+              <Route path="/dashboard" element={
+                <DashboardView
+                  transactions={transactions}
+                  accounts={accounts}
+                  budgets={budgets}
+                  activeEngine={activeEngine}
+                  onQuickParse={handleQuickParse}
+                  onOpenNewTransactionModal={() => {
+                    setTransactionModalData(null);
+                    setIsTransactionModalOpen(true);
+                  }}
+                />
+              } />
 
-        {/* Navigation Tabs */}
-        {currentUser && <NavigationTabs />}
+              <Route path="/transactions" element={
+                <TransactionsView
+                  transactions={transactions}
+                  onDeleteTransaction={handleDeleteTransaction}
+                  onOpenNewTransactionModal={() => {
+                    setTransactionModalData(null);
+                    setIsTransactionModalOpen(true);
+                  }}
+                  onBulkInsert={handleBulkInsert}
+                />
+              } />
 
-        {/* Main View Container */}
-        <main className="flex-1 max-w-7xl w-full mx-auto px-4 lg:px-8 pt-6">
-          {isLoading && (
-            <div className="flex items-center justify-center py-24 text-slate-400 text-sm animate-pulse">
-              Loading from database...
+              <Route path="/spreadsheet" element={
+                <SpreadsheetView
+                  transactions={transactions}
+                  onOpenNewTransactionModal={() => {
+                    setTransactionModalData(null);
+                    setIsTransactionModalOpen(true);
+                  }}
+                />
+              } />
+
+              <Route path="/reports" element={<ReportsView transactions={transactions} accounts={accounts} />} />
+
+              <Route path="/budgets" element={
+                <BudgetsView
+                  budgets={budgets}
+                  categories={categories}
+                  transactions={transactions}
+                  onCreateBudget={handleCreateBudget}
+                  onUpdateBudget={handleUpdateBudget}
+                  onDeleteBudget={handleDeleteBudget}
+                  onCreateCategory={handleCreateCategory}
+                  onUpdateCategory={handleUpdateCategory}
+                  onDeleteCategory={handleDeleteCategory}
+                />
+              } />
+
+              <Route path="/accounts" element={
+                <AccountsView
+                  accounts={accounts}
+                  onAddAccount={handleAddAccount}
+                />
+              } />
+
+              <Route path="/ai-sandbox" element={
+                <AIEngineSandboxView
+                  activeEngine={activeEngine}
+                  onRunTestParse={handleSandboxTestParse}
+                />
+              } />
+            </Routes>
+          </main>
+
+          {/* Modals */}
+          {activeParseModal && (
+            <AIParsingModal
+              parseResult={activeParseModal}
+              onClose={() => setActiveParseModal(null)}
+              onConfirmAutoSave={(result) => {
+                addTransactionFromParseResult(result);
+                setActiveParseModal(null);
+              }}
+              onResolveCategory={(result, selectedCategory) => {
+                addTransactionFromParseResult(result, selectedCategory);
+                setActiveParseModal(null);
+              }}
+              onOpenManualForm={(result) => {
+                setTransactionModalData({
+                  type: result.type,
+                  amount: result.amount,
+                  currency: result.currency,
+                  category: result.category,
+                  description: result.description,
+                  account: result.account,
+                  payment_method: result.payment_method,
+                  date: result.date,
+                  confidence: result.confidence,
+                  ai_parsed: true,
+                });
+                setActiveParseModal(null);
+                setIsTransactionModalOpen(true);
+              }}
+            />
+          )}
+
+          {isTransactionModalOpen && (
+            <TransactionFormModal
+              initialData={transactionModalData}
+              categories={categories}
+              accounts={accounts}
+              onClose={() => {
+                setIsTransactionModalOpen(false);
+                setTransactionModalData(null);
+              }}
+              onSave={handleSaveTransactionModal}
+            />
+          )}
+
+          {/* Budget limit trigger toast */}
+          {budgetAlert && (
+            <div className="fixed bottom-6 right-6 z-50 max-w-sm animate-pulse">
+              <div
+                className={`rounded-2xl border p-4 shadow-2xl flex items-start gap-3 ${
+                  budgetAlert.type === 'exceeded'
+                    ? 'bg-red-950 border-red-700 text-red-100'
+                    : 'bg-amber-950/90 border-amber-600 text-amber-100'
+                }`}
+              >
+                <span className="text-xl">{budgetAlert.type === 'exceeded' ? '🚨' : '⚠️'}</span>
+                <div className="flex-1">
+                  <p className="font-bold text-sm">
+                    {budgetAlert.type === 'exceeded'
+                      ? `You've exceeded your ${budgetAlert.category} budget`
+                      : `You're reaching your ${budgetAlert.category} budget`}
+                  </p>
+                  <p className="text-xs mt-0.5 opacity-90">
+                    ₹{budgetAlert.spent.toLocaleString()} spent of ₹{budgetAlert.monthlyLimit.toLocaleString()}
+                  </p>
+                </div>
+                <button
+                  onClick={() => setBudgetAlert(null)}
+                  className="text-xs opacity-80 hover:opacity-100 font-semibold"
+                >
+                  ✕
+                </button>
+              </div>
             </div>
           )}
-          
-          <Routes>
-            {!currentUser ? (
-              <>
-                <Route path="/login" element={
-                  <LoginView onLogin={(user) => {
-                    setCurrentUser(user);
-                    window.location.href = '/dashboard';
-                  }} />
-                } />
-                <Route path="*" element={<Navigate to="/login" replace />} />
-              </>
-            ) : (
-              <>
-                <Route path="/login" element={<Navigate to="/dashboard" replace />} />
-                <Route path="/" element={<Navigate to="/dashboard" replace />} />
-                
-                <Route path="/dashboard" element={
-                  <DashboardView
-                    transactions={transactions}
-                    accounts={accounts}
-                    budgets={budgets}
-                    activeEngine={activeEngine}
-                    onQuickParse={handleQuickParse}
-                    onOpenNewTransactionModal={() => {
-                      setTransactionModalData(null);
-                      setIsTransactionModalOpen(true);
-                    }}
-                  />
-                } />
-
-                <Route path="/transactions" element={
-                  <TransactionsView
-                    transactions={transactions}
-                    onDeleteTransaction={handleDeleteTransaction}
-                    onOpenNewTransactionModal={() => {
-                      setTransactionModalData(null);
-                      setIsTransactionModalOpen(true);
-                    }}
-                    onBulkInsert={handleBulkInsert}
-                  />
-                } />
-
-                <Route path="/spreadsheet" element={
-                  <SpreadsheetView
-                    transactions={transactions}
-                    onOpenNewTransactionModal={() => {
-                      setTransactionModalData(null);
-                      setIsTransactionModalOpen(true);
-                    }}
-                  />
-                } />
-
-                <Route path="/reports" element={<ReportsView transactions={transactions} accounts={accounts} />} />
-
-                <Route path="/budgets" element={
-                  <BudgetsView
-                    budgets={budgets}
-                    categories={categories}
-                    transactions={transactions}
-                    onCreateBudget={handleCreateBudget}
-                    onUpdateBudget={handleUpdateBudget}
-                    onDeleteBudget={handleDeleteBudget}
-                    onCreateCategory={handleCreateCategory}
-                    onUpdateCategory={handleUpdateCategory}
-                    onDeleteCategory={handleDeleteCategory}
-                  />
-                } />
-
-                <Route path="/accounts" element={
-                  <AccountsView
-                    accounts={accounts}
-                    onAddAccount={handleAddAccount}
-                  />
-                } />
-
-                <Route path="/ai-sandbox" element={
-                  <AIEngineSandboxView
-                    activeEngine={activeEngine}
-                    onRunTestParse={handleSandboxTestParse}
-                  />
-                } />
-              </>
-            )}
-          </Routes>
-        </main>
-
-      {/* Modals */}
-      {activeParseModal && (
-        <AIParsingModal
-          parseResult={activeParseModal}
-          onClose={() => setActiveParseModal(null)}
-          onConfirmAutoSave={(result) => {
-            addTransactionFromParseResult(result);
-            setActiveParseModal(null);
-          }}
-          onResolveCategory={(result, selectedCategory) => {
-            addTransactionFromParseResult(result, selectedCategory);
-            setActiveParseModal(null);
-          }}
-          onOpenManualForm={(result) => {
-            setTransactionModalData({
-              type: result.type,
-              amount: result.amount,
-              currency: result.currency,
-              category: result.category,
-              description: result.description,
-              account: result.account,
-              payment_method: result.payment_method,
-              date: result.date,
-              confidence: result.confidence,
-              ai_parsed: true,
-            });
-            setActiveParseModal(null);
-            setIsTransactionModalOpen(true);
-          }}
-        />
-      )}
-
-      {isTransactionModalOpen && (
-        <TransactionFormModal
-          initialData={transactionModalData}
-          categories={categories}
-          accounts={accounts}
-          onClose={() => {
-            setIsTransactionModalOpen(false);
-            setTransactionModalData(null);
-          }}
-          onSave={handleSaveTransactionModal}
-        />
-      )}
-
-      {/* Budget limit trigger toast */}
-      {budgetAlert && (
-        <div className="fixed bottom-6 right-6 z-50 max-w-sm animate-pulse">
-          <div
-            className={`rounded-2xl border p-4 shadow-2xl flex items-start gap-3 ${
-              budgetAlert.type === 'exceeded'
-                ? 'bg-red-950 border-red-700 text-red-100'
-                : 'bg-amber-950/90 border-amber-600 text-amber-100'
-            }`}
-          >
-            <span className="text-xl">{budgetAlert.type === 'exceeded' ? '🚨' : '⚠️'}</span>
-            <div className="flex-1">
-              <p className="font-bold text-sm">
-                {budgetAlert.type === 'exceeded'
-                  ? `You've exceeded your ${budgetAlert.category} budget`
-                  : `You're reaching your ${budgetAlert.category} budget`}
-              </p>
-              <p className="text-xs mt-0.5 opacity-90">
-                ₹{budgetAlert.spent.toLocaleString()} spent of ₹{budgetAlert.monthlyLimit.toLocaleString()}
-              </p>
-            </div>
-            <button
-              onClick={() => setBudgetAlert(null)}
-              className="text-xs opacity-80 hover:opacity-100 font-semibold"
-            >
-              ✕
-            </button>
-          </div>
         </div>
-      )}
-      </div>
+      </Peel>
     </BrowserRouter>
   );
 }

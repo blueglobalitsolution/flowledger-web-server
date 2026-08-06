@@ -78,6 +78,27 @@ export function logout(): void {
   storeSession(null);
 }
 
+export async function forgotPassword(email: string): Promise<{ success: boolean; otp?: string }> {
+  return apiFetch<{ success: boolean; otp?: string }>('/auth/forgot-password', {
+    method: 'POST',
+    body: JSON.stringify({ email }),
+  });
+}
+
+export async function verifyOtp(email: string, otp: string): Promise<{ success: boolean }> {
+  return apiFetch<{ success: boolean }>('/auth/verify-otp', {
+    method: 'POST',
+    body: JSON.stringify({ email, otp }),
+  });
+}
+
+export async function resetPassword(email: string, otp: string, newPassword: string): Promise<{ success: boolean }> {
+  return apiFetch<{ success: boolean }>('/auth/reset-password', {
+    method: 'POST',
+    body: JSON.stringify({ email, otp, newPassword }),
+  });
+}
+
 // ---- App AI endpoints ----
 export async function parseTransaction(text: string, engineId: string): Promise<AIParseResult> {
   return apiFetch<AIParseResult>('/ai/parse', {
