@@ -17,9 +17,16 @@ const API_BASE = import.meta.env.VITE_API_BASE || '/api';
 
 const TOKEN_KEY = 'flowledger_auth_token';
 const USER_KEY = 'flowledger_auth_user';
+const EXPIRES_KEY = 'flowledger_auth_expires';
 
 export function getStoredSession(): AuthSession | null {
   try {
+    const expiresRaw = localStorage.getItem(EXPIRES_KEY);
+    if (expiresRaw && Date.now() > parseInt(expiresRaw, 10)) {
+      storeSession(null); // Clear expired session
+      return null;
+    }
+
     const token = localStorage.getItem(TOKEN_KEY);
     const userRaw = localStorage.getItem(USER_KEY);
     if (!token || !userRaw) return null;
@@ -33,9 +40,11 @@ export function storeSession(session: AuthSession | null): void {
   if (session) {
     localStorage.setItem(TOKEN_KEY, session.token);
     localStorage.setItem(USER_KEY, JSON.stringify(session.user));
+    localStorage.setItem(EXPIRES_KEY, (Date.now() + 60 * 60 * 1000).toString()); // 1 hour expiry
   } else {
     localStorage.removeItem(TOKEN_KEY);
     localStorage.removeItem(USER_KEY);
+    localStorage.removeItem(EXPIRES_KEY);
   }
 }
 

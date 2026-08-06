@@ -1,51 +1,34 @@
 import React from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard,
   BrainCircuit,
-  Smartphone,
   ReceiptText,
   PieChart,
-  Network,
   Table,
   BarChart3,
   Landmark,
-  MoreHorizontal,
 } from 'lucide-react';
 
-export type ActiveTab =
-  | 'dashboard'
-  | 'flutter-simulator'
-  | 'transactions'
-  | 'spreadsheet'
-  | 'reports'
-  | 'budgets'
-  | 'accounts'
-  | 'more'
-  | 'ai-sandbox'
-  | 'architecture';
-
 interface NavigationTabsProps {
-  activeTab: ActiveTab;
-  onTabChange: (tab: ActiveTab) => void;
   pendingUnconfirmedCount?: number;
 }
 
 export const NavigationTabs: React.FC<NavigationTabsProps> = ({
-  activeTab,
-  onTabChange,
   pendingUnconfirmedCount = 0,
 }) => {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const currentPath = location.pathname;
+
   const tabs = [
-    { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
-    { id: 'flutter-simulator', label: 'Mobile App (iOS/Android)', icon: Smartphone, highlight: true },
-    { id: 'transactions', label: 'Transactions', icon: ReceiptText },
-    { id: 'spreadsheet', label: 'Spreadsheet', icon: Table },
-    { id: 'reports', label: 'Reports', icon: BarChart3 },
-    { id: 'budgets', label: 'Budgets', icon: PieChart },
-    { id: 'accounts', label: 'Accounts', icon: Landmark },
-    { id: 'more', label: 'More', icon: MoreHorizontal },
-    { id: 'ai-sandbox', label: 'AI Engine', icon: BrainCircuit, badge: 'Qwen 2.5 3B' },
-    { id: 'architecture', label: 'Architecture', icon: Network },
+    { id: 'dashboard', path: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
+    { id: 'transactions', path: '/transactions', label: 'Transactions', icon: ReceiptText },
+    { id: 'spreadsheet', path: '/spreadsheet', label: 'Spreadsheet', icon: Table },
+    { id: 'reports', path: '/reports', label: 'Reports', icon: BarChart3 },
+    { id: 'budgets', path: '/budgets', label: 'Budgets', icon: PieChart },
+    { id: 'accounts', path: '/accounts', label: 'Accounts', icon: Landmark },
+    { id: 'ai-sandbox', path: '/ai-sandbox', label: 'AI Engine', icon: BrainCircuit, badge: 'Qwen 2.5 3B' },
   ];
 
   return (
@@ -53,12 +36,12 @@ export const NavigationTabs: React.FC<NavigationTabsProps> = ({
       <div className="max-w-7xl mx-auto px-4 lg:px-8 flex items-center space-x-1 py-1">
         {tabs.map((t) => {
           const Icon = t.icon;
-          const isActive = activeTab === t.id;
+          const isActive = currentPath === t.path || (currentPath === '' && t.path === '/');
           return (
             <button
               key={t.id}
               id={`tab-btn-${t.id}`}
-              onClick={() => onTabChange(t.id as ActiveTab)}
+              onClick={() => navigate(t.path)}
               className={`flex items-center gap-2 px-3 py-2 rounded-lg font-medium transition-all whitespace-nowrap cursor-pointer text-xs ${
                 isActive
                   ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 shadow-sm'

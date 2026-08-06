@@ -1,12 +1,10 @@
 import React, { useState } from 'react';
 import { User, ShieldCheck, KeyRound, Mail, Lock, CheckCircle2, X, ArrowRight } from 'lucide-react';
 import { AuthUser, UserRole } from '@shared/types';
+import { login } from '@shared/api';
 
-interface AuthModalProps {
-  currentUser: AuthUser | null;
-  onClose: () => void;
+interface LoginViewProps {
   onLogin: (user: AuthUser) => void;
-  onLogout: () => void;
 }
 
 export const DEMO_USERS: Record<UserRole, AuthUser> = {
@@ -42,42 +40,31 @@ export const DEMO_USERS: Record<UserRole, AuthUser> = {
   },
 };
 
-export const AuthModal: React.FC<AuthModalProps> = ({ currentUser, onClose, onLogin, onLogout }) => {
+export const LoginView: React.FC<LoginViewProps> = ({ onLogin }) => {
   const [email, setEmail] = useState(DEMO_USERS.user.email);
   const [authSuccessMsg, setAuthSuccessMsg] = useState<string | null>(null);
 
-  const handleQuickLogin = () => {
+  const handleQuickLogin = async () => {
     const userToLogin = DEMO_USERS.user;
     setAuthSuccessMsg(`Successfully authenticated as ${userToLogin.name}`);
+    const session = await login(userToLogin.email, userToLogin.role);
     setTimeout(() => {
-      onLogin(userToLogin);
-      onClose();
+      onLogin(session.user);
     }, 500);
   };
 
-  const handleFormSubmit = (e: React.FormEvent) => {
+  const handleFormSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const userToLogin: AuthUser = {
-      ...DEMO_USERS.user,
-      email,
-      id: `usr-${Date.now()}`,
-    };
-    setAuthSuccessMsg(`Login verified for ${userToLogin.email}`);
+    setAuthSuccessMsg(`Login verified for ${email}`);
+    const session = await login(email, 'user');
     setTimeout(() => {
-      onLogin(userToLogin);
-      onClose();
+      onLogin(session.user);
     }, 500);
   };
 
   return (
-    <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-md z-50 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center p-4">
       <div className="bg-slate-900 border border-slate-800 rounded-2xl max-w-md w-full p-6 space-y-5 shadow-2xl relative text-white animate-fade-in">
-        <button
-          onClick={onClose}
-          className="absolute top-4 right-4 p-2 text-slate-400 hover:text-white bg-slate-950 hover:bg-slate-800 rounded-xl transition-colors"
-        >
-          <X className="w-4 h-4" />
-        </button>
 
         <div className="space-y-1">
           <div className="flex items-center gap-2">
@@ -96,25 +83,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ currentUser, onClose, onLo
           </div>
         )}
 
-        {currentUser && (
-          <div className="bg-slate-950 border border-slate-800 rounded-xl p-4 flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-emerald-500 to-indigo-600 flex items-center justify-center font-bold text-sm text-slate-950">
-                {currentUser.name.substring(0, 2).toUpperCase()}
-              </div>
-              <div>
-                <div className="font-bold text-sm text-white">{currentUser.name}</div>
-                <div className="text-xs text-slate-400 font-mono">{currentUser.email}</div>
-              </div>
-            </div>
-            <button
-              onClick={onLogout}
-              className="bg-rose-500/20 text-rose-300 hover:bg-rose-500 hover:text-slate-950 border border-rose-500/30 px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer"
-            >
-              Sign Out
-            </button>
-          </div>
-        )}
+        {/* current user block removed */}
 
         <button
           onClick={handleQuickLogin}

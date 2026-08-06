@@ -1,19 +1,17 @@
 import React, { useEffect, useState } from 'react';
 import { Navbar } from './components/Navbar';
-import { NavigationTabs, ActiveTab } from './components/NavigationTabs';
+import { NavigationTabs } from './components/NavigationTabs';
 import { DashboardView } from './components/DashboardView';
 import { AIEngineSandboxView } from './components/AIEngineSandboxView';
-import { FlutterSimulatorView } from './components/FlutterSimulatorView';
 import { TransactionsView } from './components/TransactionsView';
 import { SpreadsheetView } from './components/SpreadsheetView';
 import { ReportsView } from './components/ReportsView';
 import { BudgetsView } from './components/BudgetsView';
 import { AccountsView } from './components/AccountsView';
-import { MoreSettingsView } from './components/MoreSettingsView';
-import { ArchitectureView } from './components/ArchitectureView';
 import { AIParsingModal } from './components/AIParsingModal';
 import { TransactionFormModal } from './components/TransactionFormModal';
-import { AuthModal } from './components/AuthModal';
+import { LoginView } from './components/LoginView';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 
 import { AVAILABLE_AI_ENGINES } from '@shared/mockData';
 import {
@@ -40,13 +38,13 @@ import {
   getStoredSession,
   getTransactions,
   login,
+  logout,
   subscribeChanges,
   updateBudget,
   updateCategory,
 } from '@shared/api';
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState<ActiveTab>('dashboard');
   const [activeEngine, setActiveEngine] = useState<AIEngineConfig>(AVAILABLE_AI_ENGINES[0]);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [accounts, setAccounts] = useState<Account[]>([]);
@@ -56,7 +54,6 @@ export default function App() {
 
   // Authentication State
   const [currentUser, setCurrentUser] = useState<AuthUser | null>(getStoredSession()?.user ?? null);
-  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
 
   const [activeParseModal, setActiveParseModal] = useState<AIParseResult | null>(null);
   const [isTransactionModalOpen, setIsTransactionModalOpen] = useState(false);
@@ -85,13 +82,14 @@ export default function App() {
     setLastSyncedAt(new Date());
   };
 
+  const handleLogout = () => {
+    logout();
+    setCurrentUser(null);
+  };
+
   useEffect(() => {
     (async () => {
       try {
-        if (!getStoredSession()) {
-          const session = await login('mehul@flowledger.app', 'user');
-          setCurrentUser(session.user);
-        }
         await refreshData();
       } catch (err) {
         console.error('Failed to load data:', err);
@@ -261,123 +259,114 @@ export default function App() {
   };
 
   return (
-    <div id="flowledger-root" className="min-h-screen bg-slate-950 text-slate-100 font-sans selection:bg-emerald-500 selection:text-slate-950 flex flex-col">
-      {/* Top Navbar */}
-      <Navbar
-        activeEngine={activeEngine}
-        quickParseCount={transactions.filter((t) => t.ai_parsed).length}
-        currentUser={currentUser}
-        lastSyncedAt={lastSyncedAt}
-        onOpenAuthModal={() => setIsAuthModalOpen(true)}
-      />
-
-      {/* Navigation Tabs */}
-      <NavigationTabs
-        activeTab={activeTab}
-        onTabChange={(tab) => setActiveTab(tab)}
-      />
-
-      {/* Main View Container */}
-      <main className="flex-1 max-w-7xl w-full mx-auto px-4 lg:px-8 pt-6">
-        {isLoading && (
-          <div className="flex items-center justify-center py-24 text-slate-400 text-sm animate-pulse">
-            Loading from database...
-          </div>
-        )}
-        {activeTab === 'dashboard' && (
-          <DashboardView
-            transactions={transactions}
-            accounts={accounts}
-            budgets={budgets}
+    <BrowserRouter>
+      <div id="flowledger-root" className="min-h-screen bg-slate-950 text-slate-100 font-sans selection:bg-emerald-500 selection:text-slate-950 flex flex-col">
+        {currentUser && (
+          <Navbar
             activeEngine={activeEngine}
-            onQuickParse={handleQuickParse}
-            onOpenNewTransactionModal={() => {
-              setTransactionModalData(null);
-              setIsTransactionModalOpen(true);
-            }}
+            quickParseCount={transactions.filter((t) => t.ai_parsed).length}
+            currentUser={currentUser}
+            lastSyncedAt={lastSyncedAt}
+            onLogout={handleLogout}
           />
         )}
 
-        {activeTab === 'flutter-simulator' && (
-          <FlutterSimulatorView
-            transactions={transactions}
-            accounts={accounts}
-            onAddTransaction={async (tx) => {
-              const { id, ...input } = tx;
-              await createTransaction(input);
-              await refreshData();
-            }}
-            activeEngineName={activeEngine.name}
-          />
-        )}
+        {/* Navigation Tabs */}
+        {currentUser && <NavigationTabs />}
 
-        {activeTab === 'transactions' && (
-          <TransactionsView
-            transactions={transactions}
-            onDeleteTransaction={handleDeleteTransaction}
-            onOpenNewTransactionModal={() => {
-              setTransactionModalData(null);
-              setIsTransactionModalOpen(true);
-            }}
-            onBulkInsert={handleBulkInsert}
-          />
-        )}
+        {/* Main View Container */}
+        <main className="flex-1 max-w-7xl w-full mx-auto px-4 lg:px-8 pt-6">
+          {isLoading && (
+            <div className="flex items-center justify-center py-24 text-slate-400 text-sm animate-pulse">
+              Loading from database...
+            </div>
+          )}
+          
+          <Routes>
+            {!currentUser ? (
+              <>
+                <Route path="/login" element={
+                  <LoginView onLogin={(user) => {
+                    setCurrentUser(user);
+                    window.location.href = '/dashboard';
+                  }} />
+                } />
+                <Route path="*" element={<Navigate to="/login" replace />} />
+              </>
+            ) : (
+              <>
+                <Route path="/login" element={<Navigate to="/dashboard" replace />} />
+                <Route path="/" element={<Navigate to="/dashboard" replace />} />
+                
+                <Route path="/dashboard" element={
+                  <DashboardView
+                    transactions={transactions}
+                    accounts={accounts}
+                    budgets={budgets}
+                    activeEngine={activeEngine}
+                    onQuickParse={handleQuickParse}
+                    onOpenNewTransactionModal={() => {
+                      setTransactionModalData(null);
+                      setIsTransactionModalOpen(true);
+                    }}
+                  />
+                } />
 
-        {activeTab === 'spreadsheet' && (
-          <SpreadsheetView
-            transactions={transactions}
-            onOpenNewTransactionModal={() => {
-              setTransactionModalData(null);
-              setIsTransactionModalOpen(true);
-            }}
-          />
-        )}
+                <Route path="/transactions" element={
+                  <TransactionsView
+                    transactions={transactions}
+                    onDeleteTransaction={handleDeleteTransaction}
+                    onOpenNewTransactionModal={() => {
+                      setTransactionModalData(null);
+                      setIsTransactionModalOpen(true);
+                    }}
+                    onBulkInsert={handleBulkInsert}
+                  />
+                } />
 
-        {activeTab === 'reports' && <ReportsView transactions={transactions} accounts={accounts} />}
+                <Route path="/spreadsheet" element={
+                  <SpreadsheetView
+                    transactions={transactions}
+                    onOpenNewTransactionModal={() => {
+                      setTransactionModalData(null);
+                      setIsTransactionModalOpen(true);
+                    }}
+                  />
+                } />
 
-        {activeTab === 'budgets' && (
-          <BudgetsView
-            budgets={budgets}
-            categories={categories}
-            transactions={transactions}
-            onCreateBudget={handleCreateBudget}
-            onUpdateBudget={handleUpdateBudget}
-            onDeleteBudget={handleDeleteBudget}
-            onCreateCategory={handleCreateCategory}
-            onUpdateCategory={handleUpdateCategory}
-            onDeleteCategory={handleDeleteCategory}
-          />
-        )}
+                <Route path="/reports" element={<ReportsView transactions={transactions} accounts={accounts} />} />
 
-        {activeTab === 'accounts' && (
-          <AccountsView
-            accounts={accounts}
-            onAddAccount={handleAddAccount}
-          />
-        )}
+                <Route path="/budgets" element={
+                  <BudgetsView
+                    budgets={budgets}
+                    categories={categories}
+                    transactions={transactions}
+                    onCreateBudget={handleCreateBudget}
+                    onUpdateBudget={handleUpdateBudget}
+                    onDeleteBudget={handleDeleteBudget}
+                    onCreateCategory={handleCreateCategory}
+                    onUpdateCategory={handleUpdateCategory}
+                    onDeleteCategory={handleDeleteCategory}
+                  />
+                } />
 
-        {activeTab === 'more' && <MoreSettingsView />}
+                <Route path="/accounts" element={
+                  <AccountsView
+                    accounts={accounts}
+                    onAddAccount={handleAddAccount}
+                  />
+                } />
 
-        {activeTab === 'ai-sandbox' && (
-          <AIEngineSandboxView
-            activeEngine={activeEngine}
-            onRunTestParse={handleSandboxTestParse}
-          />
-        )}
-
-        {activeTab === 'architecture' && <ArchitectureView />}
-      </main>
-
-      {/* Modals */}
-      {isAuthModalOpen && (
-        <AuthModal
-          currentUser={currentUser}
-          onClose={() => setIsAuthModalOpen(false)}
-          onLogin={(user) => setCurrentUser(user)}
-          onLogout={() => setCurrentUser(null)}
-        />
-      )}
-
+                <Route path="/ai-sandbox" element={
+                  <AIEngineSandboxView
+                    activeEngine={activeEngine}
+                    onRunTestParse={handleSandboxTestParse}
+                  />
+                } />
+              </>
+            )}
+          </Routes>
+        </main>
 
       {/* Modals */}
       {activeParseModal && (
@@ -454,6 +443,7 @@ export default function App() {
           </div>
         </div>
       )}
-    </div>
+      </div>
+    </BrowserRouter>
   );
 }

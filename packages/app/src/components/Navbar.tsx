@@ -7,7 +7,7 @@ interface NavbarProps {
   quickParseCount: number;
   currentUser: AuthUser | null;
   lastSyncedAt: Date | null;
-  onOpenAuthModal: () => void;
+  onLogout: () => void;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
@@ -15,7 +15,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   quickParseCount,
   currentUser,
   lastSyncedAt,
-  onOpenAuthModal,
+  onLogout,
 }) => {
   const syncedLabel = lastSyncedAt
     ? `Live • ${lastSyncedAt.toLocaleTimeString()}`
@@ -61,7 +61,7 @@ export const Navbar: React.FC<NavbarProps> = ({
 
           {/* User / Admin / Super Admin Login Profile Pill */}
           <button
-            onClick={onOpenAuthModal}
+            onClick={currentUser ? onLogout : undefined}
             className="flex items-center gap-2 bg-slate-800 hover:bg-slate-700 border border-slate-700 px-3 py-1.5 rounded-xl text-xs font-medium transition-all cursor-pointer shadow-md group"
           >
             {currentUser ? (
