@@ -9,7 +9,6 @@ import { AccountsView } from './components/AccountsView';
 import { AIParsingModal } from './components/AIParsingModal';
 import { TransactionFormModal } from './components/TransactionFormModal';
 import { LoginView } from './components/LoginView';
-import { Peel } from './components/Peel';
 import { Sidebar } from './components/Sidebar';
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -249,16 +248,9 @@ export default function App() {
   }
 
   return (
-      <Peel
-        side="left"
-        mode="cursor"
-        reveal={320}
-        zone={180}
-        smoothing={0.15}
-        className="w-full min-h-screen"
-        under={<Sidebar currentUser={currentUser} onLogout={handleLogout} />}
-      >
-        <div id="flowledger-root" className="min-h-screen text-slate-100 font-sans flex flex-col" style={{ background: '#181d27', minHeight: '100vh' }}>
+    <div className="flex min-h-screen bg-[#181d27]">
+      <Sidebar currentUser={currentUser} onLogout={handleLogout} />
+      <div id="flowledger-root" className="flex-1 min-h-screen text-slate-100 font-sans flex flex-col overflow-x-hidden" style={{ background: '#181d27', minHeight: '100vh' }}>
           {/* Main View Container */}
           <main className="flex-1 w-full mx-auto px-6 py-8">
             {isLoading && (
@@ -432,6 +424,6 @@ export default function App() {
             </div>
           )}
         </div>
-      </Peel>
+      </div>
   );
 }
