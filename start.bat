@@ -51,19 +51,30 @@ if errorlevel 1 (
 echo [OK] Ollama ready
 
 REM ---- 5. Start the API gateway (serves web + API) ----
-echo [..] Starting FlowLedger Gateway on port 3000...
-powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0start-gateway.ps1"
+echo Starting FlowLedger Production Server...
+echo ==========================================
 
-REM ---- 6. Open the app in the browser ----
-timeout /t 4 /nobreak >nul
-start "" http://localhost:3000
+:: 4. Start the API Server in the background
+start "FlowLedger Web API" cmd /c "npm run start -w @flowledger/api"
+
+:: 5. Start the Mobile API Server in the background
+start "FlowLedger Mobile API" cmd /c "npm run start -w @flowledger/api-mobile"
 
 echo.
 echo ==========================================
 echo   FlowLedger is running!
 echo   Web app   : http://localhost:3000
+echo   Mobile API: http://localhost:3001
 echo.
 echo   Phone (same Wi-Fi): http://192.168.0.105:3000
 echo ==========================================
 echo.
-pause
+echo Press any key to stop all servers...
+pause >nul
+
+:: Cleanup on exit
+taskkill /FI "WindowTitle eq FlowLedger Web API*" /T /F >nul 2>&1
+taskkill /FI "WindowTitle eq FlowLedger Mobile API*" /T /F >nul 2>&1
+taskkill /IM ollama.exe /F >nul 2>&1
+
+echo Servers stopped.

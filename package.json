@@ -5,14 +5,16 @@
   "type": "module",
   "workspaces": [
     "api",
+    "api-mobile",
     "packages/*"
   ],
   "scripts": {
-    "dev": "concurrently -n api,app -c green,blue \"npm run dev -w @flowledger/api\" \"npm run dev -w @flowledger/app\"",
+    "dev": "concurrently -n api,api-mobile,app -c green,yellow,blue \"npm run dev -w @flowledger/api\" \"npm run dev -w @flowledger/api-mobile\" \"npm run dev -w @flowledger/app\"",
     "dev:api": "npm run dev -w @flowledger/api",
+    "dev:api-mobile": "npm run dev -w @flowledger/api-mobile",
     "dev:app": "npm run dev -w @flowledger/app",
-    "build": "npm run build -w @flowledger/api && npm run build -w @flowledger/app",
-    "start": "npm run start -w @flowledger/api",
+    "build": "npm run build -w @flowledger/api && npm run build -w @flowledger/api-mobile && npm run build -w @flowledger/app",
+    "start": "concurrently \"npm run start -w @flowledger/api\" \"npm run start -w @flowledger/api-mobile\"",
     "lint": "npm run lint -w @flowledger/api && npm run lint -w @flowledger/app",
     "clean": "rm -rf dist packages/*/dist packages/*/node_modules node_modules"
   },

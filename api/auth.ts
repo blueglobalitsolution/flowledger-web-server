@@ -215,62 +215,6 @@ authRouter.post('/reset-password', (req: Request, res: Response) => {
   res.json({ success: true, message: 'Password updated successfully. You can now log in.' });
 });
 
-// Mobile OTP Login - Step 1: Request OTP
-authRouter.post('/mobile-login-request', (req: Request, res: Response) => {
-  const { email } = req.body ?? {};
-  const lowerEmail = (email || '').toLowerCase().trim();
-
-  const user = Object.values(DEMO_ACCOUNTS).find((acc) => acc.email.toLowerCase() === lowerEmail);
-  if (!user) {
-    return res.status(404).json({ error: 'You are not an authorized user.' });
-  }
-
-  const otp = Math.floor(100000 + Math.random() * 900000).toString();
-  const expiresAt = Date.now() + 3 * 60 * 1000;
-  otpStore.set(lowerEmail, { otp, expiresAt, verified: false });
-
-  console.log(`[MOBILE AUTH] OTP generated for ${lowerEmail}: ${otp}`);
-  
-  // Return OTP directly in response to simulate a push notification on the device
-  res.json({ success: true, message: 'OTP generated', otp });
-});
-
-// Mobile OTP Login - Step 2: Verify OTP and Login
-authRouter.post('/mobile-login-verify', (req: Request, res: Response) => {
-  const { email, otp } = req.body ?? {};
-  const lowerEmail = (email || '').toLowerCase().trim();
-
-  const entry = otpStore.get(lowerEmail);
-  if (!entry) {
-    return res.status(400).json({ error: 'No active OTP session found for this email.' });
-  }
-  if (Date.now() > entry.expiresAt) {
-    otpStore.delete(lowerEmail);
-    return res.status(400).json({ error: 'The OTP code has expired.' });
-  }
-  if (entry.otp !== otp) {
-    return res.status(400).json({ error: 'Invalid OTP code.' });
-  }
-
-  // OTP is valid!
-  otpStore.delete(lowerEmail);
-
-  // Find the real user account to get their role
-  const baseUser = Object.values(DEMO_ACCOUNTS).find((acc) => acc.email.toLowerCase() === lowerEmail);
-  if (!baseUser) {
-    return res.status(404).json({ error: 'User account not found.' });
-  }
-
-  const user: AuthUser = {
-    ...baseUser,
-    id: `usr-${Date.now()}`,
-  };
-
-  const token = Buffer.from(JSON.stringify({ sub: user.email, role: user.role } satisfies AuthPayload)).toString('base64');
-  const session: AuthSession = { user, token };
-  
-  res.json(session);
-});
 
 export function requireRole(...roles: UserRole[]) {
   return (req: Request, res: Response, next: NextFunction) => {

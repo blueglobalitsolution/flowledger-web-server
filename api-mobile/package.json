@@ -1,0 +1,24 @@
+{
+  "name": "@flowledger/api-mobile",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch server.ts",
+    "build": "esbuild server.ts --bundle --platform=node --format=cjs --packages=external --sourcemap --outfile=../dist/mobile-server.cjs",
+    "start": "node ../dist/mobile-server.cjs"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "express": "^4.19.2",
+    "@shared/types": "*"
+  },
+  "devDependencies": {
+    "@types/cors": "^2.8.17",
+    "@types/express": "^4.17.21",
+    "@types/node": "^20.12.12",
+    "esbuild": "^0.21.3",
+    "tsx": "^4.10.5",
+    "typescript": "^5.4.5"
+  }
+}
