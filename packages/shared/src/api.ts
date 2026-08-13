@@ -1,14 +1,11 @@
 import {
   Account,
   AIParseResult,
-  AdminTelemetryResponse,
-  AuditLogEntry,
   AuthSession,
   AuthUser,
   Budget,
   BudgetAlert,
   Category,
-  SuperAdminTelemetryResponse,
   Transaction,
   UserRole,
 } from './types';
@@ -222,31 +219,4 @@ export function subscribeChanges(
   return () => es.close();
 }
 
-// ---- Admin endpoints (role: admin+) ----
-export async function getAdminTelemetry(): Promise<AdminTelemetryResponse> {
-  return apiFetch<AdminTelemetryResponse>('/admin/telemetry');
-}
 
-// ---- Super Admin endpoints (role: superadmin) ----
-export async function getSuperAdminTelemetry(): Promise<SuperAdminTelemetryResponse> {
-  return apiFetch<SuperAdminTelemetryResponse>('/superadmin/telemetry');
-}
-
-export async function createTenant(tenantName: string): Promise<{ success: boolean; message: string }> {
-  return apiFetch('/superadmin/tenants', {
-    method: 'POST',
-    body: JSON.stringify({ tenantName }),
-  });
-}
-
-export async function rotateApiKeys(): Promise<{ success: boolean; message: string }> {
-  return apiFetch('/superadmin/rotate-keys', { method: 'POST' });
-}
-
-export async function triggerBackup(): Promise<{ success: boolean; message: string }> {
-  return apiFetch('/superadmin/backup', { method: 'POST' });
-}
-
-export async function getAuditLogs(): Promise<AuditLogEntry[]> {
-  return apiFetch<AuditLogEntry[]>('/superadmin/audit');
-}

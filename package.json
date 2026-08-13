@@ -8,14 +8,12 @@
     "packages/*"
   ],
   "scripts": {
-    "dev": "concurrently -n api,app,admin,superadmin -c green,blue,magenta,yellow \"npm run dev -w @flowledger/api\" \"npm run dev -w @flowledger/app\" \"npm run dev -w @flowledger/admin\" \"npm run dev -w @flowledger/superadmin\"",
+    "dev": "concurrently -n api,app -c green,blue \"npm run dev -w @flowledger/api\" \"npm run dev -w @flowledger/app\"",
     "dev:api": "npm run dev -w @flowledger/api",
     "dev:app": "npm run dev -w @flowledger/app",
-    "dev:admin": "npm run dev -w @flowledger/admin",
-    "dev:superadmin": "npm run dev -w @flowledger/superadmin",
-    "build": "npm run build -w @flowledger/api && npm run build -w @flowledger/app && npm run build -w @flowledger/admin && npm run build -w @flowledger/superadmin",
+    "build": "npm run build -w @flowledger/api && npm run build -w @flowledger/app",
     "start": "npm run start -w @flowledger/api",
-    "lint": "npm run lint -w @flowledger/api && npm run lint -w @flowledger/app && npm run lint -w @flowledger/admin && npm run lint -w @flowledger/superadmin",
+    "lint": "npm run lint -w @flowledger/api && npm run lint -w @flowledger/app",
     "clean": "rm -rf dist packages/*/dist packages/*/node_modules node_modules"
   },
   "devDependencies": {

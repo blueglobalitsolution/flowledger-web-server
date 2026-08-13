@@ -5,8 +5,6 @@ import cors from 'cors';
 import { authRouter } from './auth';
 import { aiRouter } from './routers/ai';
 import { dataRouter } from './routers/data';
-import { adminRouter } from './routers/admin';
-import { superAdminRouter } from './routers/superadmin';
 import { eventsRouter } from './events';
 
 const PORT = 3000;
@@ -44,13 +42,9 @@ async function startServer() {
   app.use('/api', eventsRouter);
   app.use('/api', aiRouter);
   app.use('/api', dataRouter);
-  app.use('/api/admin', adminRouter);
-  app.use('/api/superadmin', superAdminRouter);
 
   // --- Frontend modules (production: serve built apps at path bases) ---
   if (isProduction) {
-    serveModule(app, '/admin', 'admin');
-    serveModule(app, '/superadmin', 'superadmin');
     const appDist = path.join(distRoot, 'app');
     if (fs.existsSync(path.join(appDist, 'index.html'))) {
       app.use(express.static(appDist));
@@ -62,7 +56,7 @@ async function startServer() {
     app.get('/', (req, res) => {
       res.json({
         status: 'ok',
-        message: 'FlowLedger API Gateway is running. Frontend modules run on their Vite dev servers (app:5173, admin:5174, superadmin:5175).',
+        message: 'FlowLedger API Gateway is running. Frontend modules run on their Vite dev servers (app:5173).',
       });
     });
   }

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Cpu, Activity, Layers, User, Shield, Crown, LogIn } from 'lucide-react';
+import { Cpu, Activity, Layers, User, LogIn } from 'lucide-react';
 import { AIEngineConfig, AuthUser } from '@shared/types';
 
 interface NavbarProps {
@@ -59,7 +59,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             </div>
           </div>
 
-          {/* User / Admin / Super Admin Login Profile Pill */}
+          {/* User Login Profile Pill */}
           <button
             onClick={currentUser ? onLogout : undefined}
             className="flex items-center gap-2 bg-slate-800 hover:bg-slate-700 border border-slate-700 px-3 py-1.5 rounded-xl text-xs font-medium transition-all cursor-pointer shadow-md group"
@@ -67,31 +67,21 @@ export const Navbar: React.FC<NavbarProps> = ({
             {currentUser ? (
               <>
                 <div className="w-6 h-6 rounded-lg bg-emerald-500/20 text-emerald-400 font-bold flex items-center justify-center text-[10px] border border-emerald-500/30">
-                  {currentUser.role === 'superadmin' ? (
-                    <Crown className="w-3.5 h-3.5 text-amber-400" />
-                  ) : currentUser.role === 'admin' ? (
-                    <Shield className="w-3.5 h-3.5 text-indigo-400" />
-                  ) : (
-                    <User className="w-3.5 h-3.5 text-emerald-400" />
-                  )}
+                  <User className="w-3.5 h-3.5 text-emerald-400" />
                 </div>
                 <div className="text-left font-mono leading-tight">
                   <div className="font-bold text-white text-[11px] group-hover:text-emerald-300">
                     {currentUser.name.split(' ')[0]}
                   </div>
                   <div className="text-[9px] text-slate-400 uppercase font-bold">
-                    {currentUser.role === 'superadmin'
-                      ? '👑 Super Admin'
-                      : currentUser.role === 'admin'
-                      ? '🛡️ Admin'
-                      : '👤 User'}
+                    👤 User
                   </div>
                 </div>
               </>
             ) : (
               <>
                 <LogIn className="w-4 h-4 text-emerald-400" />
-                <span className="font-bold text-white">Login / Roles</span>
+                <span className="font-bold text-white">Login</span>
               </>
             )}
           </button>

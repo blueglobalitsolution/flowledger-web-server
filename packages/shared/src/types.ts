@@ -104,42 +104,7 @@ export interface NotificationItem {
   read: boolean;
 }
 
-export interface AdminTenantMetric {
-  tenantName: string;
-  usersCount: number;
-  transactionsThisMonth: number;
-  aiParseRequests: number;
-  monthlySpendUSD: number;
-  status: 'active' | 'warning' | 'suspended';
-}
-
-export interface RosterUser {
-  id: string;
-  name: string;
-  email: string;
-  role: UserRole;
-  department: string;
-  status: 'Active' | 'Suspended' | 'Invited';
-}
-
-export interface AuditLogEntry {
-  id: string;
-  timestamp: string;
-  actor: string;
-  action: string;
-  ip: string;
-  status: 'Success' | 'Failed' | 'Pending';
-}
-
-export interface SystemTelemetry {
-  gpuLoad: string;
-  cpuLoad: string;
-  tokensProcessed: string;
-  monthlyMrr: number;
-  jsonCompliance: string;
-}
-
-export type UserRole = 'user' | 'admin' | 'superadmin';
+export type UserRole = 'user';
 
 export interface AuthUser {
   id: string;
@@ -158,12 +123,4 @@ export interface AuthSession {
   token: string;
 }
 
-export interface AdminTelemetryResponse {
-  tenants: AdminTenantMetric[];
-  roster: RosterUser[];
-  telemetry: SystemTelemetry;
-}
 
-export interface SuperAdminTelemetryResponse extends AdminTelemetryResponse {
-  auditLogs: AuditLogEntry[];
-}

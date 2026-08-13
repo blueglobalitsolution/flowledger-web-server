@@ -62,8 +62,6 @@ echo.
 echo ==========================================
 echo   FlowLedger is running!
 echo   Web app   : http://localhost:3000
-echo   Admin     : http://localhost:3000/admin/
-echo   SuperAdmin: http://localhost:3000/superadmin/
 echo.
 echo   Phone (same Wi-Fi): http://192.168.0.105:3000
 echo ==========================================

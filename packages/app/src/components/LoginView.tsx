@@ -18,26 +18,6 @@ export const DEMO_USERS: Record<UserRole, AuthUser> = {
     biometricRegistered: true,
     plan: 'Pro Plan',
   },
-  admin: {
-    id: 'usr-002',
-    name: 'Sarah Jenkins (TechCorp Admin)',
-    email: 'sarah.jenkins@techcorp.io',
-    role: 'admin',
-    tenantName: 'TechCorp Pvt Ltd',
-    twoFactorEnabled: true,
-    biometricRegistered: true,
-    plan: 'Enterprise Admin',
-  },
-  superadmin: {
-    id: 'usr-003',
-    name: 'Alex Rivera (Root Super Admin)',
-    email: 'alex.rivera@flowledger.app',
-    role: 'superadmin',
-    tenantName: 'FlowLedger SaaS Infrastructure',
-    twoFactorEnabled: true,
-    biometricRegistered: true,
-    plan: 'Super Admin Root Access',
-  },
 };
 
 type Step = 'login' | 'forgot-email' | 'forgot-otp' | 'forgot-reset';
