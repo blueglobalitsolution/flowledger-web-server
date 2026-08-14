@@ -4,6 +4,7 @@ import { mkdirSync } from 'node:fs';
 import type { Account, Budget, BudgetAlert, Category, Transaction, TransactionType } from '@shared/types';
 
 export const DEFAULT_ALERT_THRESHOLD = 90;
+export const SEPARATOR = ' > ';
 
 // Store data outside dist/ so clean/rebuild never wipes user data.
 // Resolve the entry module's dir (dev: api/server.ts; prod: dist/server.cjs) so
