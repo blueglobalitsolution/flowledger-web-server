@@ -94,9 +94,41 @@ if (accountCount === 0) {
   ).run('acc-default', 'Physical Wallet', 'Cash', 0.0, '₹', null, '#10B981', 'Wallet');
 }
 
+// Auto-seed missing accounts referenced by transactions
+const allTxs = db.prepare('SELECT * FROM transactions').all() as any[];
+const referencedAccounts = new Set<string>();
+for (const tx of allTxs) {
+  if (tx.account) {
+    referencedAccounts.add(tx.account);
+  }
+}
+
+for (const accName of referencedAccounts) {
+  const exists = db.prepare('SELECT COUNT(*) as count FROM accounts WHERE name = ?').get(accName) as { count: number };
+  if (exists.count === 0) {
+    let type = 'Bank';
+    let color = '#10B981';
+    let icon = 'Building2';
+    
+    const lowerName = accName.toLowerCase();
+    if (lowerName.includes('cash') || lowerName.includes('wallet') || lowerName.includes('physical')) {
+      type = 'Cash';
+      color = '#F59E0B';
+      icon = 'Wallet';
+    } else if (lowerName.includes('card')) {
+      type = 'Credit Card';
+      color = '#EF4444';
+      icon = 'CreditCard';
+    }
+    
+    db.prepare(
+      'INSERT INTO accounts (id, name, type, balance, currency, accountNumber, color, icon) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
+    ).run(`acc-auto-${Date.now()}-${Math.floor(Math.random() * 1000)}`, accName, type, 0.0, '₹', null, color, icon);
+  }
+}
+
 // Recalculate account balances from transactions
 const allAccounts = db.prepare('SELECT * FROM accounts').all() as any[];
-const allTxs = db.prepare('SELECT * FROM transactions').all() as any[];
 for (const acc of allAccounts) {
   let balance = 0.0;
   for (const tx of allTxs) {
