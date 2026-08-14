@@ -86,6 +86,31 @@ if (!catCols.has('keywords')) db.exec('ALTER TABLE categories ADD COLUMN keyword
 const txCols = new Set((db.prepare('PRAGMA table_info(transactions)').all() as { name: string }[]).map((c) => c.name));
 if (!txCols.has('tags')) db.exec('ALTER TABLE transactions ADD COLUMN tags TEXT');
 
+// Seed default account if empty
+const accountCount = (db.prepare('SELECT COUNT(*) as count FROM accounts').get() as { count: number }).count;
+if (accountCount === 0) {
+  db.prepare(
+    'INSERT INTO accounts (id, name, type, balance, currency, accountNumber, color, icon) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
+  ).run('acc-default', 'Physical Wallet', 'Cash', 0.0, '₹', null, '#10B981', 'Wallet');
+}
+
+// Recalculate account balances from transactions
+const allAccounts = db.prepare('SELECT * FROM accounts').all() as any[];
+const allTxs = db.prepare('SELECT * FROM transactions').all() as any[];
+for (const acc of allAccounts) {
+  let balance = 0.0;
+  for (const tx of allTxs) {
+    if (tx.account === acc.name) {
+      if (tx.type === 'income') {
+        balance += tx.amount;
+      } else if (tx.type === 'expense') {
+        balance -= tx.amount;
+      }
+    }
+  }
+  db.prepare('UPDATE accounts SET balance = ? WHERE id = ?').run(balance, acc.id);
+}
+
 
 interface TxRow {
   id: string;
