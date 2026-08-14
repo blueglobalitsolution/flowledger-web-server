@@ -196,7 +196,17 @@ export function resolveCategory(
 
   if (!category) {
     // Deterministic default by keywords + type.
-    const isIncome = type === 'income' || lower.includes('received') || lower.includes('salary') || lower.includes('client') || lower.includes('paid me');
+    const isIncome = type === 'income' || 
+      lower.includes('received') || 
+      lower.includes('receive') || 
+      lower.includes('recive') || 
+      lower.includes('recieved') || 
+      lower.includes('got') || 
+      lower.includes('credited') || 
+      lower.includes('deposit') || 
+      lower.includes('salary') || 
+      lower.includes('client') || 
+      lower.includes('paid me');
     const isExpense = !isIncome;
     if (type === 'income' || isIncome) {
       if (lower.includes('salary')) category = 'Salary > Monthly Salary';
@@ -276,7 +286,19 @@ export function fallbackParseFinancialText(text: string, accounts?: string[], ca
   else if (text.includes('£')) currency = '£';
 
   let type: 'income' | 'expense' | 'transfer' = 'expense';
-  if (lower.includes('salary') || lower.includes('received') || lower.includes('got paid') || lower.includes('income') || lower.includes('refund') || lower.includes('freelance') || lower.includes('deposit') || lower.includes('paid me')) {
+  if (
+    lower.includes('salary') || 
+    lower.includes('received') || 
+    lower.includes('receive') || 
+    lower.includes('recive') || 
+    lower.includes('recieved') || 
+    lower.includes('got') || 
+    lower.includes('credited') || 
+    lower.includes('deposit') || 
+    lower.includes('refund') || 
+    lower.includes('freelance') || 
+    lower.includes('paid me')
+  ) {
     type = 'income';
   } else if (lower.includes('transfer') || lower.includes('moved to') || lower.includes('sent to bank') || lower.includes('to bank') || lower.includes('to cash')) {
     type = 'transfer';
