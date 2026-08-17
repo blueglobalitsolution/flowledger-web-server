@@ -1,5 +1,5 @@
 import React from 'react';
-import { Cpu, Activity, Layers, User, LogIn } from 'lucide-react';
+import { Cpu, Activity, User, LogIn } from 'lucide-react';
 import { AIEngineConfig, AuthUser } from '@shared/types';
 
 interface NavbarProps {
@@ -25,8 +25,8 @@ export const Navbar: React.FC<NavbarProps> = ({
       <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-4">
         {/* Brand & Subtitle */}
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-emerald-500 via-teal-500 to-indigo-600 flex items-center justify-center text-white shadow-lg shadow-emerald-500/20 ring-1 ring-white/20">
-            <Layers className="w-5 h-5" />
+          <div className="w-10 h-10 rounded-xl overflow-hidden shadow-lg shadow-emerald-500/20 ring-1 ring-white/20">
+            <img src="/logo.png" alt="FlowLedger" className="w-full h-full object-cover" />
           </div>
           <div>
             <div className="flex items-center gap-2">

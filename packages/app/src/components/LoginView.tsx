@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { AuthUser, UserRole } from '@shared/types';
 import { login, forgotPassword, verifyOtp, resetPassword } from '@shared/api';
-import { Layers } from 'lucide-react';
 
 interface LoginViewProps {
   onLogin: (user: AuthUser) => void;
@@ -195,20 +194,17 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLogin }) => {
             justifyContent: 'center',
           }}
         >
-          <div
+          <img
+            src="/logo.png"
+            alt="FlowLedger"
             style={{
               width: '44px',
               height: '44px',
               borderRadius: '12px',
-              background: 'linear-gradient(135deg, #bcfc6a 0%, #8c63e6 100%)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
+              objectFit: 'cover',
               boxShadow: 'rgba(188, 252, 106, 0.3) 0px 4px 16px',
             }}
-          >
-            <Layers style={{ width: '22px', height: '22px', color: '#000000' }} />
-          </div>
+          />
           <div>
             <div
               style={{

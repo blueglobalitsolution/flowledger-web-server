@@ -8,7 +8,6 @@ import {
   Table,
   BarChart3,
   Landmark,
-  Layers,
   LogOut,
   Sparkles,
   ChevronRight,
@@ -56,8 +55,8 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentUser, onLogout }) => {
       <div className="space-y-6">
         {/* Brand Header */}
         <div className="flex items-center gap-3 px-2 pt-1">
-          <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-[#bcfc6a] to-[#8c63e6] flex items-center justify-center shadow-lg shadow-[#bcfc6a]/20 shrink-0">
-            <Layers className="w-5 h-5 text-slate-950 stroke-[2.5]" />
+          <div className="w-10 h-10 rounded-2xl overflow-hidden shadow-lg shadow-[#bcfc6a]/20 shrink-0">
+            <img src="/logo.png" alt="FlowLedger" className="w-full h-full object-cover" />
           </div>
           <div>
             <h1 className="text-lg font-black tracking-tight text-white flex items-center gap-1.5 leading-none">
