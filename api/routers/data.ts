@@ -1,21 +1,5 @@
 import { Router } from 'express';
-import {
-  addAccount,
-  addBudget,
-  addCategory,
-  addTransaction,
-  deleteBudget,
-  deleteCategory,
-  deleteTransaction,
-  ensureCategory,
-  listAccounts,
-  listBudgets,
-  listCategories,
-  listTransactions,
-  updateBudget,
-  updateCategory,
-  DEFAULT_ALERT_THRESHOLD,
-} from '../store';
+import { getStore, DEFAULT_ALERT_THRESHOLD } from '../store';
 import { requireRole } from '../auth';
 import { broadcastChange, broadcastEvent } from '../events';
 
@@ -24,6 +8,7 @@ export const dataRouter: Router = Router();
 const isUser = requireRole('user', 'admin', 'superadmin');
 
 dataRouter.get('/transactions', isUser, (req, res) => {
+  const store = getStore((req as any).auth.sub);
   const { month, type, category } = req.query;
   const filters =
     typeof month === 'string' || typeof type === 'string' || typeof category === 'string'
@@ -33,19 +18,20 @@ dataRouter.get('/transactions', isUser, (req, res) => {
           category: typeof category === 'string' ? category : undefined,
         }
       : undefined;
-  res.json({ transactions: listTransactions(filters) });
+  res.json({ transactions: store.listTransactions(filters) });
 });
 
 dataRouter.post('/transactions', isUser, (req, res) => {
+  const store = getStore((req as any).auth.sub);
   const body = req.body ?? {};
   if (typeof body.amount !== 'number' || Number.isNaN(body.amount)) {
     res.status(400).json({ error: 'amount is required and must be a number.' });
     return;
   }
-  const { transaction: tx, alert } = addTransaction({
+  const { transaction: tx, alert } = store.addTransaction({
     type: body.type || 'expense',
     amount: body.amount,
-    currency: body.currency || '₹',
+    currency: body.currency || '?',
     category: body.category || 'Other',
     description: body.description || 'Untitled transaction',
     account: body.account || 'Physical Wallet',
@@ -60,12 +46,13 @@ dataRouter.post('/transactions', isUser, (req, res) => {
   });
   broadcastChange();
   if (alert) broadcastEvent('budget-alert', alert);
-  ensureCategory(tx.category, tx.type === 'income' ? 'income' : tx.type === 'transfer' ? 'transfer' : 'expense');
+  store.ensureCategory(tx.category, tx.type === 'income' ? 'income' : tx.type === 'transfer' ? 'transfer' : 'expense');
   res.status(201).json({ transaction: tx, alert: alert ?? null });
 });
 
 dataRouter.delete('/transactions/:id', isUser, (req, res) => {
-  const deleted = deleteTransaction(req.params.id);
+  const store = getStore((req as any).auth.sub);
+  const deleted = store.deleteTransaction(req.params.id);
   if (!deleted) {
     res.status(404).json({ error: 'Transaction not found.' });
     return;
@@ -75,20 +62,22 @@ dataRouter.delete('/transactions/:id', isUser, (req, res) => {
 });
 
 dataRouter.get('/accounts', isUser, (req, res) => {
-  res.json({ accounts: listAccounts() });
+  const store = getStore((req as any).auth.sub);
+  res.json({ accounts: store.listAccounts() });
 });
 
 dataRouter.post('/accounts', isUser, (req, res) => {
+  const store = getStore((req as any).auth.sub);
   const body = req.body ?? {};
   if (!body.name || typeof body.name !== 'string') {
     res.status(400).json({ error: 'name is required.' });
     return;
   }
-  const account = addAccount({
+  const account = store.addAccount({
     name: body.name,
     type: body.type || 'Bank',
     balance: Number(body.balance) || 0,
-    currency: body.currency || '₹',
+    currency: body.currency || '?',
     accountNumber: body.accountNumber,
     color: body.color || '#3B82F6',
     icon: body.icon || 'Landmark',
@@ -98,30 +87,33 @@ dataRouter.post('/accounts', isUser, (req, res) => {
 });
 
 dataRouter.get('/budgets', isUser, (req, res) => {
-  res.json({ budgets: listBudgets() });
+  const store = getStore((req as any).auth.sub);
+  res.json({ budgets: store.listBudgets() });
 });
 
 dataRouter.post('/budgets', isUser, (req, res) => {
+  const store = getStore((req as any).auth.sub);
   const body = req.body ?? {};
   if (!body.category || typeof body.category !== 'string') {
     res.status(400).json({ error: 'category is required.' });
     return;
   }
-  const budget = addBudget({
+  const budget = store.addBudget({
     category: body.category,
     monthlyLimit: Number(body.monthlyLimit) || 0,
     spent: Number(body.spent) || 0,
     period: body.period || new Date().toISOString().slice(0, 7),
     alertThreshold: Number(body.alertThreshold) || DEFAULT_ALERT_THRESHOLD,
   });
-  ensureCategory(budget.category, 'expense');
+  store.ensureCategory(budget.category, 'expense');
   broadcastChange();
   res.status(201).json({ budget });
 });
 
 dataRouter.put('/budgets/:id', isUser, (req, res) => {
+  const store = getStore((req as any).auth.sub);
   const body = req.body ?? {};
-  const budget = updateBudget(req.params.id, {
+  const budget = store.updateBudget(req.params.id, {
     category: typeof body.category === 'string' ? body.category : undefined,
     monthlyLimit: body.monthlyLimit !== undefined ? Number(body.monthlyLimit) || 0 : undefined,
     spent: body.spent !== undefined ? Number(body.spent) || 0 : undefined,
@@ -133,14 +125,15 @@ dataRouter.put('/budgets/:id', isUser, (req, res) => {
     return;
   }
   if (body.category && typeof body.category === 'string') {
-    ensureCategory(budget.category, 'expense');
+    store.ensureCategory(budget.category, 'expense');
   }
   broadcastChange();
   res.json({ budget });
 });
 
 dataRouter.delete('/budgets/:id', isUser, (req, res) => {
-  if (!deleteBudget(req.params.id)) {
+  const store = getStore((req as any).auth.sub);
+  if (!store.deleteBudget(req.params.id)) {
     res.status(404).json({ error: 'Budget not found.' });
     return;
   }
@@ -149,17 +142,19 @@ dataRouter.delete('/budgets/:id', isUser, (req, res) => {
 });
 
 dataRouter.get('/categories', isUser, (req, res) => {
-  res.json({ categories: listCategories() });
+  const store = getStore((req as any).auth.sub);
+  res.json({ categories: store.listCategories() });
 });
 
 dataRouter.post('/categories', isUser, (req, res) => {
+  const store = getStore((req as any).auth.sub);
   const body = req.body ?? {};
   if (!body.name || typeof body.name !== 'string' || !body.name.trim()) {
     res.status(400).json({ error: 'name is required.' });
     return;
   }
   const type: 'income' | 'expense' | 'transfer' = ['income', 'expense', 'transfer'].includes(body.type) ? body.type : 'expense';
-  const cat = addCategory({
+  const cat = store.addCategory({
     name: body.name,
     parent: typeof body.parent === 'string' ? body.parent : undefined,
     type,
@@ -176,8 +171,9 @@ dataRouter.post('/categories', isUser, (req, res) => {
 });
 
 dataRouter.put('/categories/:id', isUser, (req, res) => {
+  const store = getStore((req as any).auth.sub);
   const body = req.body ?? {};
-  const cat = updateCategory(req.params.id, {
+  const cat = store.updateCategory(req.params.id, {
     name: typeof body.name === 'string' ? body.name : undefined,
     parent: body.parent !== undefined ? (body.parent === null ? null : String(body.parent)) : undefined,
     type: ['income', 'expense', 'transfer'].includes(body.type) ? body.type : undefined,
@@ -194,7 +190,8 @@ dataRouter.put('/categories/:id', isUser, (req, res) => {
 });
 
 dataRouter.delete('/categories/:id', isUser, (req, res) => {
-  if (!deleteCategory(req.params.id)) {
+  const store = getStore((req as any).auth.sub);
+  if (!store.deleteCategory(req.params.id)) {
     res.status(404).json({ error: 'Category not found.' });
     return;
   }

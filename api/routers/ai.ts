@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { fallbackParseFinancialText, isOllamaConnected, OLLAMA_MODEL, parseWithOllama, resolveAccount, resolveCategory } from '../ollama';
 import { parseWithDeepSeek, DEEPSEEK_MODEL } from '../deepseek';
-import { listCategories } from '../store';
+import { getStore } from '../store';
 
 export const aiRouter: Router = Router();
 
@@ -32,7 +32,9 @@ aiRouter.post('/ai/parse', async (req, res) => {
       ? accounts.filter((a: unknown): a is string => typeof a === 'string' && a.trim().length > 0)
       : [];
 
-    const categories = listCategories();
+    const userId = (req as any).auth?.sub ?? 'mehul@flowledger.app';
+    const store = getStore(userId);
+    const categories = store.listCategories();
     const startTime = Date.now();
 
     let parsedData: any = null;
