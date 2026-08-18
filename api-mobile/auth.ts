@@ -29,6 +29,35 @@ export interface AuthPayload {
 
 export const authRouter: Router = Router();
 
+// Mobile Registration - Sign Up
+authRouter.post('/mobile-signup', (req: Request, res: Response) => {
+  const { name, email } = req.body ?? {};
+  const lowerEmail = (email || '').toLowerCase().trim();
+
+  if (!lowerEmail || !name) {
+    return res.status(400).json({ error: 'Name and email are required.' });
+  }
+
+  if (DEMO_ACCOUNTS[lowerEmail]) {
+    return res.status(400).json({ error: 'An account with this email already exists.' });
+  }
+
+  // Create new user in memory
+  DEMO_ACCOUNTS[lowerEmail] = {
+    id: `usr-${Date.now()}`,
+    name: name.trim(),
+    email: lowerEmail,
+    role: 'user',
+    tenantName: 'Personal Wallet',
+    twoFactorEnabled: false,
+    biometricRegistered: false,
+    plan: 'Free Plan',
+  };
+
+  console.log(`[MOBILE AUTH] New user registered: ${lowerEmail}`);
+  res.json({ success: true, message: 'Account created successfully.' });
+});
+
 // Mobile OTP Login - Step 1: Request OTP
 authRouter.post('/mobile-login-request', (req: Request, res: Response) => {
   const { email } = req.body ?? {};
