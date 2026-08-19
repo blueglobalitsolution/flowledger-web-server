@@ -107,7 +107,7 @@ authRouter.post('/mobile-signup', (req: Request, res: Response) => {
 });
 
 // Mobile OTP Login - Step 1: Request OTP
-authRouter.post('/mobile-login-request', (req: Request, res: Response) => {
+authRouter.post('/mobile-login-request', async (req: Request, res: Response) => {
   const { email } = req.body ?? {};
   const lowerEmail = (email || '').toLowerCase().trim();
 
