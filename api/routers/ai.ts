@@ -19,6 +19,34 @@ aiRouter.get('/health', async (req, res) => {
   });
 });
 
+/// Resolves the customer for a parsed transaction.
+/// 1. If the AI returned a real customer id, use it.
+/// 2. If the AI returned a customer NAME (not an id), match it to a real id.
+/// 3. Otherwise match any customer whose name appears in the text.
+function resolveCustomerId(parsedData: any, text: string, customers: any[]): string | null {
+  if (!Array.isArray(customers)) return null;
+
+  const realIds = new Set(customers.map((c: any) => c && c.id).filter(Boolean));
+  const candidate = parsedData?.customerId || null;
+
+  if (candidate && realIds.has(candidate)) return candidate;
+
+  const lowerText = text.toLowerCase();
+
+  const byName = (name: string) => {
+    const n = (name || '').trim();
+    return n && n.length >= 3 && lowerText.includes(n.toLowerCase());
+  };
+
+  if (candidate) {
+    const byAiName = customers.find((c: any) => c && c.name && c.name.toLowerCase() === String(candidate).toLowerCase());
+    if (byAiName) return byAiName.id;
+  }
+
+  const matched = customers.find((c: any) => c && c.name && byName(c.name));
+  return matched ? matched.id : null;
+}
+
 aiRouter.post('/ai/parse', async (req, res) => {
   try {
     const { text, engine = DEEPSEEK_MODEL, accounts, customers } = req.body ?? {};
@@ -99,14 +127,7 @@ aiRouter.post('/ai/parse', async (req, res) => {
     const type = parsedData.type === 'income' || parsedData.type === 'transfer' ? parsedData.type : 'expense';
     const categoryResult = resolveCategory(type, parsedData.category, text, categories);
 
-    let customerId = parsedData.customerId || null;
-    if (!customerId && Array.isArray(customers)) {
-      const lowerText = text.toLowerCase();
-      const matched = customers.find((c: any) => c && c.name && c.name.length >= 3 && lowerText.includes(c.name.toLowerCase()));
-      if (matched) {
-        customerId = matched.id;
-      }
-    }
+    const customerId = resolveCustomerId(parsedData, text, customers ?? []);
 
     const result = {
       type,

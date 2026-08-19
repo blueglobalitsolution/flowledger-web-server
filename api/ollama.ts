@@ -43,6 +43,7 @@ export function buildCustomerInstruction(customers?: any[]): string {
   if (!customers || customers.length === 0) return '';
   // Simplify color values for prompt readability
   const simplified = customers.map(c => ({
+    id: c.id,
     name: c.name,
     labelName: c.labelName,
     baseIncome: c.baseIncome,
