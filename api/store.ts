@@ -180,9 +180,9 @@ export class UserStore {
     const month = filters?.month; const type = filters?.type; const category = filters?.category;
     let rows: any[];
     if (!month && !type && !category) {
-      rows = this.db.prepare('SELECT * FROM transactions ORDER BY date DESC').all();
+      rows = this.db.prepare('SELECT * FROM transactions ORDER BY date DESC, id DESC').all();
     } else {
-      rows = this.db.prepare(`SELECT * FROM transactions WHERE (? IS NULL OR date LIKE ?) AND (? IS NULL OR type = ?) AND (? IS NULL OR category = ?) ORDER BY date DESC`).all(
+      rows = this.db.prepare(`SELECT * FROM transactions WHERE (? IS NULL OR date LIKE ?) AND (? IS NULL OR type = ?) AND (? IS NULL OR category = ?) ORDER BY date DESC, id DESC`).all(
         month ?? null, month ? `${month}%` : null, type ?? null, type ?? null, category ?? null, category ?? null
       );
     }
