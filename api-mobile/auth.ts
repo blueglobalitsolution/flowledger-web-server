@@ -2,9 +2,6 @@ import { Request, Response, Router } from 'express';
 import type { AuthSession, AuthUser, UserRole } from '@shared/types';
 
 // Duplicated from main API for the standalone mobile backend
-const USER_PASSWORDS: Record<string, string> = {
-  'mehul@flowledger.app': 'password123',
-};
 const DEMO_ACCOUNTS: Record<string, AuthUser> = {
   'mehul@flowledger.app': {
     id: 'usr-001',
@@ -34,11 +31,11 @@ export const authRouter: Router = Router();
 
 // Mobile Registration - Sign Up
 authRouter.post('/mobile-signup', (req: Request, res: Response) => {
-  const { name, email, password } = req.body ?? {};
+  const { name, email } = req.body ?? {};
   const lowerEmail = (email || '').toLowerCase().trim();
 
-  if (!lowerEmail || !name || !password) {
-    return res.status(400).json({ error: 'Name, email, and password are required.' });
+  if (!lowerEmail || !name) {
+    return res.status(400).json({ error: 'Name and email are required.' });
   }
 
   if (DEMO_ACCOUNTS[lowerEmail]) {
@@ -56,7 +53,6 @@ authRouter.post('/mobile-signup', (req: Request, res: Response) => {
     biometricRegistered: false,
     plan: 'Free Plan',
   };
-  USER_PASSWORDS[lowerEmail] = password; // Save the password
 
   console.log(`[MOBILE AUTH] New user registered: ${lowerEmail}`);
   res.json({ success: true, message: 'Account created successfully.' });
@@ -73,7 +69,7 @@ authRouter.post('/mobile-login-request', (req: Request, res: Response) => {
   }
 
   const otp = Math.floor(100000 + Math.random() * 900000).toString();
-  const expiresAt = Date.now() + 3 * 60 * 1000;
+  const expiresAt = Date.now() + 60 * 1000; // 1 minute expiration
   otpStore.set(lowerEmail, { otp, expiresAt, verified: false });
 
   console.log(`[MOBILE AUTH] OTP generated for ${lowerEmail}: ${otp}`);

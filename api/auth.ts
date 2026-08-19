@@ -22,8 +22,18 @@ function loadEnv() {
 }
 loadEnv();
 
-const DEMO_ACCOUNTS: Record<UserRole, AuthUser> = {
-  user: {
+const DEMO_ACCOUNTS: Record<string, AuthUser> = {
+  'bhavanbadhe@gmail.com': {
+    id: 'usr-001',
+    name: 'Bhavan',
+    email: 'bhavanbadhe@gmail.com',
+    role: 'user',
+    tenantName: 'Personal Wallet',
+    twoFactorEnabled: false,
+    biometricRegistered: false,
+    plan: 'Pro Plan',
+  },
+  'mehul@flowledger.app': {
     id: 'usr-001',
     name: 'Mehul Solanki',
     email: 'mehul@flowledger.app',
@@ -55,12 +65,7 @@ const DEMO_ACCOUNTS: Record<UserRole, AuthUser> = {
   },
 };
 
-// Simulated password database
-const USER_PASSWORDS: Record<string, string> = {
-  'mehul@flowledger.app': 'password123',
-  'sarah.jenkins@techcorp.io': 'password123',
-  'alex.rivera@flowledger.app': 'password123',
-};
+
 
 // OTP In-Memory Storage
 interface OtpEntry {
@@ -121,57 +126,31 @@ export interface AuthPayload {
 
 export const authRouter: Router = Router();
 
-authRouter.post('/login', (req: Request, res: Response) => {
-  const { email, role } = req.body ?? {};
-  const requestedRole: UserRole = (['user', 'admin', 'superadmin'] as UserRole[]).includes(role)
-    ? role
-    : 'user';
-
-  const user: AuthUser = {
-    ...DEMO_ACCOUNTS[requestedRole],
-    email: email || DEMO_ACCOUNTS[requestedRole].email,
-    id: `usr-${Date.now()}`,
-  };
-
-  const token = Buffer.from(JSON.stringify({ sub: user.email, role: user.role } satisfies AuthPayload)).toString('base64');
-
-  const session: AuthSession = { user, token };
-  res.json(session);
-});
 
 
-
-// Forgot Password Step 1: Send OTP email
-authRouter.post('/forgot-password', async (req: Request, res: Response) => {
+authRouter.post('/login-otp', async (req: Request, res: Response) => {
   const { email } = req.body ?? {};
   const lowerEmail = (email || '').toLowerCase().trim();
 
-  // 1. Verify if email exists in database
   const user = Object.values(DEMO_ACCOUNTS).find((acc) => acc.email.toLowerCase() === lowerEmail);
   if (!user) {
-    return res.status(404).json({ error: 'You are not an authorized user.' });
+    return res.status(404).json({ error: 'Account not found. Please register first.' });
   }
 
-  // 2. Generate 6-digit OTP
   const otp = Math.floor(100000 + Math.random() * 900000).toString();
-
-  // 3. Store OTP in-memory with 3-minute expiry
-  const expiresAt = Date.now() + 3 * 60 * 1000;
+  const expiresAt = Date.now() + 60 * 1000; // 1 minute expiration
   otpStore.set(lowerEmail, { otp, expiresAt, verified: false });
 
-  // 4. Send email
   const isSent = await sendOtpEmail(lowerEmail, otp);
 
-  // Return generated OTP in response for easy dev testing if SMTP not configured
   res.json({
     success: true,
-    message: isSent ? 'OTP sent to your email.' : 'OTP generated (SMTP not configured, checked console).',
+    message: isSent ? 'OTP sent to your email.' : 'OTP generated (SMTP not configured, check console).',
     otp: isSent ? undefined : otp, // send back if dev fallback
   });
 });
 
-// Forgot Password Step 2: Verify OTP code
-authRouter.post('/verify-otp', (req: Request, res: Response) => {
+authRouter.post('/verify-login-otp', (req: Request, res: Response) => {
   const { email, otp } = req.body ?? {};
   const lowerEmail = (email || '').toLowerCase().trim();
 
@@ -179,42 +158,26 @@ authRouter.post('/verify-otp', (req: Request, res: Response) => {
   if (!entry) {
     return res.status(400).json({ error: 'No active OTP verification session found.' });
   }
-
   if (Date.now() > entry.expiresAt) {
     otpStore.delete(lowerEmail);
-    return res.status(400).json({ error: 'The OTP code has expired. OTP is only valid for 3 minutes.' });
+    return res.status(400).json({ error: 'The OTP code has expired.' });
   }
-
   if (entry.otp !== otp) {
-    return res.status(400).json({ error: 'Invalid OTP code. Please check and try again.' });
+    return res.status(400).json({ error: 'Invalid OTP code.' });
   }
 
-  // Mark verified
-  entry.verified = true;
-  res.json({ success: true, message: 'OTP verified successfully.' });
-});
+  const userTemplate = Object.values(DEMO_ACCOUNTS).find(acc => acc.email.toLowerCase() === lowerEmail) || DEMO_ACCOUNTS.user;
+  const user: AuthUser = {
+    ...userTemplate,
+    email: lowerEmail,
+    id: `usr-${Date.now()}`,
+  };
 
-// Forgot Password Step 3: Reset password
-authRouter.post('/reset-password', (req: Request, res: Response) => {
-  const { email, otp, newPassword } = req.body ?? {};
-  const lowerEmail = (email || '').toLowerCase().trim();
+  const token = Buffer.from(JSON.stringify({ sub: user.email, role: user.role } satisfies AuthPayload)).toString('base64');
+  const session: AuthSession = { user, token };
 
-  const entry = otpStore.get(lowerEmail);
-  if (!entry || !entry.verified || entry.otp !== otp) {
-    return res.status(400).json({ error: 'Unauthorized reset request. Please verify OTP first.' });
-  }
-
-  if (Date.now() > entry.expiresAt) {
-    otpStore.delete(lowerEmail);
-    return res.status(400).json({ error: 'Session expired. Please request a new OTP.' });
-  }
-
-  // Update password
-  USER_PASSWORDS[lowerEmail] = newPassword;
   otpStore.delete(lowerEmail);
-
-  console.log(`[AUTH] Password updated successfully for user: ${lowerEmail} -> ${newPassword}`);
-  res.json({ success: true, message: 'Password updated successfully. You can now log in.' });
+  res.json(session);
 });
 
 

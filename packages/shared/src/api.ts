@@ -63,10 +63,24 @@ async function apiFetch<T>(path: string, options: RequestInit = {}): Promise<T> 
 
 // ---- Auth ----
 
-export async function login(email: string, role: UserRole): Promise<AuthSession> {
-  const session = await apiFetch<AuthSession>('/auth/login', {
+export async function register(name: string, email: string): Promise<{ success: boolean; message: string }> {
+  return apiFetch<{ success: boolean; message: string }>('/auth/register', {
     method: 'POST',
-    body: JSON.stringify({ email, role }),
+    body: JSON.stringify({ name, email }),
+  });
+}
+
+export async function requestLoginOtp(email: string): Promise<{ success: boolean; message: string; otp?: string }> {
+  return apiFetch<{ success: boolean; message: string; otp?: string }>('/auth/login-otp', {
+    method: 'POST',
+    body: JSON.stringify({ email }),
+  });
+}
+
+export async function verifyLoginOtp(email: string, otp: string): Promise<AuthSession> {
+  const session = await apiFetch<AuthSession>('/auth/verify-login-otp', {
+    method: 'POST',
+    body: JSON.stringify({ email, otp }),
   });
   storeSession(session);
   return session;
@@ -74,27 +88,6 @@ export async function login(email: string, role: UserRole): Promise<AuthSession>
 
 export function logout(): void {
   storeSession(null);
-}
-
-export async function forgotPassword(email: string): Promise<{ success: boolean; otp?: string }> {
-  return apiFetch<{ success: boolean; otp?: string }>('/auth/forgot-password', {
-    method: 'POST',
-    body: JSON.stringify({ email }),
-  });
-}
-
-export async function verifyOtp(email: string, otp: string): Promise<{ success: boolean }> {
-  return apiFetch<{ success: boolean }>('/auth/verify-otp', {
-    method: 'POST',
-    body: JSON.stringify({ email, otp }),
-  });
-}
-
-export async function resetPassword(email: string, otp: string, newPassword: string): Promise<{ success: boolean }> {
-  return apiFetch<{ success: boolean }>('/auth/reset-password', {
-    method: 'POST',
-    body: JSON.stringify({ email, otp, newPassword }),
-  });
 }
 
 // ---- App AI endpoints ----
