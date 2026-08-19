@@ -8,7 +8,7 @@ export const tenants: AdminTenantMetric[] = [
 ];
 
 export const roster: RosterUser[] = [
-  { id: 'u1', name: 'Mehul Solanki', email: 'mehul@flowledger.app', role: 'user', department: 'Finance', status: 'Active' },
+  { id: 'u1', name: 'Mehul Solanki', email: 'mehulsolanki.n70@gmail.com', role: 'user', department: 'Finance', status: 'Active' },
   { id: 'u2', name: 'Sarah Jenkins', email: 'sarah.jenkins@techcorp.io', role: 'admin', department: 'Operations', status: 'Active' },
   { id: 'u3', name: 'Alex Rivera', email: 'alex.rivera@flowledger.app', role: 'superadmin', department: 'Executive', status: 'Active' },
   { id: 'u4', name: 'Rohan Sharma', email: 'rohan@techcorp.io', role: 'user', department: 'Accounting', status: 'Active' },
@@ -17,7 +17,7 @@ export const roster: RosterUser[] = [
 export const auditLogs: AuditLogEntry[] = [
   { id: 'log-1', timestamp: '2026-08-02 02:14:02', actor: 'alex.rivera@flowledger.app (Super Admin)', action: 'Rotated Global Qwen API Keys', ip: '192.168.1.104', status: 'Success' },
   { id: 'log-2', timestamp: '2026-08-02 01:52:19', actor: 'sarah.jenkins@techcorp.io (Admin)', action: 'Updated Enterprise Monthly AI Limit to 15,000', ip: '10.0.4.12', status: 'Success' },
-  { id: 'log-3', timestamp: '2026-08-02 00:30:11', actor: 'mehul@flowledger.app (User)', action: 'Executed AI Natural Language Parse', ip: '172.16.0.8', status: 'Success' },
+  { id: 'log-3', timestamp: '2026-08-02 00:30:11', actor: 'mehulsolanki.n70@gmail.com (User)', action: 'Executed AI Natural Language Parse', ip: '172.16.0.8', status: 'Success' },
 ];
 
 export const telemetry: SystemTelemetry = {

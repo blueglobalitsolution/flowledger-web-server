@@ -32,7 +32,7 @@ aiRouter.post('/ai/parse', async (req, res) => {
       ? accounts.filter((a: unknown): a is string => typeof a === 'string' && a.trim().length > 0)
       : [];
 
-    const userId = (req as any).auth?.sub ?? 'mehul@flowledger.app';
+    const userId = (req as any).auth?.sub ?? 'mehulsolanki.n70@gmail.com';
     const store = getStore(userId);
     const categories = store.listCategories();
     const startTime = Date.now();

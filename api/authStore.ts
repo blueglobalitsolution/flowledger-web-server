@@ -11,7 +11,7 @@ class AuthStore {
   private db: DatabaseSync;
 
   constructor() {
-    this.db = new DatabaseSync(join(dataDir, 'auth.db'));
+    this.db = new DatabaseSync(join(dataDir, 'auth.db'), { timeout: 10000 });
     this.init();
   }
 
@@ -31,11 +31,12 @@ class AuthStore {
       );
     `);
 
-    // Seed default admin account if table is empty
-    const countRow = this.db.prepare(`SELECT COUNT(*) as count FROM users`).get() as { count: number };
-    if (countRow.count === 0) {
-      this.createUser({
-        email: 'mehul@flowledger.app',
+    // Seed known accounts if missing (idempotent). Runs on startup so existing
+    // users are always present regardless of whether the table was already
+    // seeded by a previous process.
+    const knownUsers: AuthUser[] = [
+      {
+        email: 'mehulsolanki.n70@gmail.com',
         id: 'usr-001',
         name: 'Mehul Solanki',
         role: 'superadmin',
@@ -43,8 +44,23 @@ class AuthStore {
         twoFactorEnabled: true,
         biometricRegistered: true,
         plan: 'Super Admin Root Access'
-      });
-      console.log('[AUTH DB] Seeded default superadmin account.');
+      },
+      {
+        email: 'bhavanbadhe@gmail.com',
+        id: 'usr-002',
+        name: 'Bhavan',
+        role: 'user',
+        tenantName: 'Personal Wallet',
+        twoFactorEnabled: false,
+        biometricRegistered: false,
+        plan: 'Pro Plan'
+      }
+    ];
+    for (const u of knownUsers) {
+      if (!this.getUserByEmail(u.email)) {
+        this.createUser(u);
+        console.log(`[AUTH DB] Seeded account: ${u.email}`);
+      }
     }
   }
 

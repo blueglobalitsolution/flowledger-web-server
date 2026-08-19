@@ -24,7 +24,7 @@ export class UserStore {
   constructor(public userId: string) {
     // Sanitize email/userId for filename
     const safeName = userId.replace(/[^a-zA-Z0-9]/g, '_');
-    this.db = new DatabaseSync(join(dataDir, `${safeName}_flowledger.db`));
+    this.db = new DatabaseSync(join(dataDir, `${safeName}_flowledger.db`), { timeout: 10000 });
     this.init();
   }
 
