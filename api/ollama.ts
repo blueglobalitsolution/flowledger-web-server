@@ -67,7 +67,8 @@ export function buildSystemInstruction(categories?: Category[], accounts?: strin
   return [
     'You are a finance parser. Extract transaction details. Always return valid JSON. Never explain. Never add markdown.',
     'Return:',
-    "- type: 'income' | 'expense' | 'transfer'",
+    "- type: 'income' | 'expense' | 'transfer' | 'customer_ledger' | 'chat'",
+    "If the user is asking a general question, asking for help, greeting you, listing customers, or just chatting, set type to 'chat', and write your conversational reply in the description field. Set amount to 0, confidence to 99, and leave other fields empty/default.",
     '- amount: number (numeric value only)',
     "- currency: '₹' | '$' | '€' | '£'",
     '- category: string (see CATEGORIES below)',

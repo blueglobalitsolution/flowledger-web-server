@@ -54,7 +54,32 @@ aiRouter.post('/ai/parse', async (req, res) => {
     
     const processingTime = Date.now() - startTime;
 
+    if (parsedData && parsedData.type === 'chat') {
+      res.json({
+        type: 'chat',
+        amount: 0,
+        currency: '₹',
+        category: 'Chat',
+        description: parsedData.description || 'Hello!',
+        account: 'None',
+        payment_method: 'None',
+        date: new Date().toISOString().split('T')[0],
+        confidence: parsedData.confidence || 99,
+        engine_used: engineUsed,
+        processing_time_ms: Math.min(300, Math.max(45, processingTime)),
+      });
+      return;
+    }
+
     if (parsedData && parsedData.type === 'customer_ledger') {
+      let matchedCustomer = parsedData.customer;
+      if (matchedCustomer && matchedCustomer.name) {
+        const dbCustomers = store.listCustomers();
+        const found = dbCustomers.find(c => c.name.toLowerCase().trim() === matchedCustomer.name.toLowerCase().trim());
+        if (found) {
+          matchedCustomer = found;
+        }
+      }
       res.json({
         type: 'customer_ledger',
         amount: 0,
@@ -67,7 +92,7 @@ aiRouter.post('/ai/parse', async (req, res) => {
         confidence: parsedData.confidence || 99,
         engine_used: engineUsed,
         processing_time_ms: Math.min(300, Math.max(45, processingTime)),
-        customer: parsedData.customer
+        customer: matchedCustomer
       });
       return;
     }
