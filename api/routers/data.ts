@@ -43,6 +43,7 @@ dataRouter.post('/transactions', isUser, (req, res) => {
     status: body.status || 'completed',
     notes: body.notes,
     tags: Array.isArray(body.tags) ? body.tags : undefined,
+    customerId: body.customerId || null,
   });
   broadcastChange();
   if (alert) broadcastEvent('budget-alert', alert);

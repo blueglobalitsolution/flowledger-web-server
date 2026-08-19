@@ -105,7 +105,38 @@ export class UserStore {
     
     const txCols = new Set((this.db.prepare('PRAGMA table_info(transactions)').all() as { name: string }[]).map((c) => c.name));
     if (!txCols.has('tags')) this.db.exec('ALTER TABLE transactions ADD COLUMN tags TEXT');
-    if (!txCols.has('customerId')) this.db.exec('ALTER TABLE transactions ADD COLUMN customerId TEXT');
+    if (!txCols.has('customerId')) {
+      this.db.exec('ALTER TABLE transactions ADD COLUMN customerId TEXT');
+    }
+
+    // Unconditional migration: Link old transactions by matching description/notes with customer names
+    try {
+      const customersTableExists = (this.db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='customers'").get() as any);
+      if (customersTableExists) {
+        const customers = this.db.prepare('SELECT id, name FROM customers').all() as { id: string, name: string }[];
+        const updateStmt = this.db.prepare(`
+          UPDATE transactions 
+          SET customerId = ? 
+          WHERE customerId IS NULL 
+            AND (
+              LOWER(description) LIKE ? 
+              OR LOWER(notes) LIKE ?
+            )
+        `);
+        let migratedCount = 0;
+        for (const c of customers) {
+          if (!c.name || c.name.length < 3) continue; // Avoid matching too short names like "a" or "i"
+          const searchPattern = `%${c.name.toLowerCase()}%`;
+          const res = updateStmt.run(c.id, searchPattern, searchPattern) as { changes: number };
+          migratedCount += res.changes;
+        }
+        if (migratedCount > 0) {
+          console.log(`[Migration] Successfully linked ${migratedCount} historical transactions to customers.`);
+        }
+      }
+    } catch (err) {
+      console.error('Failed to run transaction-customer history migration:', err);
+    }
 
     const accountCount = (this.db.prepare('SELECT COUNT(*) as count FROM accounts').get() as { count: number }).count;
     if (accountCount === 0) {
