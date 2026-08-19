@@ -38,7 +38,31 @@ export function buildCategoryInstruction(categories: Category[]): string {
     .join('\n');
 }
 
-export function buildSystemInstruction(categories?: Category[], accounts?: string[]): string {
+
+export function buildCustomerInstruction(customers?: any[]): string {
+  if (!customers || customers.length === 0) return '';
+  // Simplify color values for prompt readability
+  const simplified = customers.map(c => ({
+    name: c.name,
+    labelName: c.labelName,
+    baseIncome: c.baseIncome,
+    baseExpense: c.baseExpense,
+    service: c.service
+  }));
+  return `\nCUSTOMERS LIST (FOR RETRIEVING CUSTOMER LEDGERS):
+${JSON.stringify(simplified)}
+If the user asks to "show ledger", "show details", "check balance", "how much is", or any query regarding a specific customer's ledger, you MUST return a JSON object with this EXACT structure:
+{
+  "type": "customer_ledger",
+  "customer": { ... the matching customer object from the list (with original id/color if known, otherwise just name) ... },
+  "description": "A brief conversational summary of this customer's details (e.g. 'Here is the ledger card for John Doe. They are a VIP client with a base income of ...')",
+  "confidence": 99
+}
+\
+`;
+}
+
+export function buildSystemInstruction(categories?: Category[], accounts?: string[], customers?: any[]): string {
   const categorySection = categories?.length ? buildCategoryInstruction(categories) : '';
   return [
     'You are a finance parser. Extract transaction details. Always return valid JSON. Never explain. Never add markdown.',
@@ -55,6 +79,7 @@ export function buildSystemInstruction(categories?: Category[], accounts?: strin
     '- confidence: number between 60 and 99 reflecting confidence score',
     categorySection,
     accountConstraint(accounts),
+    buildCustomerInstruction(customers),
   ]
     .filter(Boolean)
     .join('\n');
@@ -241,7 +266,7 @@ export async function isOllamaConnected(): Promise<boolean> {
   }
 }
 
-export async function parseWithOllama(text: string, accounts?: string[], categories?: Category[]): Promise<any | null> {
+export async function parseWithOllama(text: string, accounts?: string[], categories?: Category[], customers?: any[]): Promise<any | null> {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 60000);
   try {
@@ -252,7 +277,7 @@ export async function parseWithOllama(text: string, accounts?: string[], categor
       body: JSON.stringify({
         model: OLLAMA_MODEL,
         prompt: `Parse this financial utterance into JSON: "${text}"`,
-        system: buildSystemInstruction(categories, accounts),
+        system: buildSystemInstruction(categories, accounts, customers),
         format: 'json',
         stream: false,
         options: { temperature: 0, num_predict: 400 },

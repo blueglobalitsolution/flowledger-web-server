@@ -21,7 +21,7 @@ aiRouter.get('/health', async (req, res) => {
 
 aiRouter.post('/ai/parse', async (req, res) => {
   try {
-    const { text, engine = DEEPSEEK_MODEL, accounts } = req.body ?? {};
+    const { text, engine = DEEPSEEK_MODEL, accounts, customers } = req.body ?? {};
 
     if (!text || typeof text !== 'string') {
       res.status(400).json({ error: 'Text prompt is required for transaction parsing.' });
@@ -40,18 +40,38 @@ aiRouter.post('/ai/parse', async (req, res) => {
     let parsedData: any = null;
     let engineUsed = 'DeepSeek';
 
-    parsedData = await parseWithDeepSeek(text, accountNames, categories);
+    parsedData = await parseWithDeepSeek(text, accountNames, categories, customers);
     if (parsedData) {
       engineUsed = `DeepSeek (${DEEPSEEK_MODEL})`;
     } else {
-      parsedData = await parseWithOllama(text, accountNames, categories);
+      parsedData = await parseWithOllama(text, accountNames, categories, customers);
       engineUsed = parsedData
         ? 'Qwen 2.5 3B Instruct (Ollama fallback)'
         : 'Regex fallback';
       parsedData = parsedData ?? fallbackParseFinancialText(text, accountNames, categories);
     }
 
+    
     const processingTime = Date.now() - startTime;
+
+    if (parsedData && parsedData.type === 'customer_ledger') {
+      res.json({
+        type: 'customer_ledger',
+        amount: 0,
+        currency: '₹',
+        category: 'Customer',
+        description: parsedData.description || 'Here is the customer ledger.',
+        account: 'None',
+        payment_method: 'None',
+        date: new Date().toISOString().split('T')[0],
+        confidence: parsedData.confidence || 99,
+        engine_used: engineUsed,
+        processing_time_ms: Math.min(300, Math.max(45, processingTime)),
+        customer: parsedData.customer
+      });
+      return;
+    }
+
 
     const type = parsedData.type === 'income' || parsedData.type === 'transfer' ? parsedData.type : 'expense';
     const categoryResult = resolveCategory(type, parsedData.category, text, categories);

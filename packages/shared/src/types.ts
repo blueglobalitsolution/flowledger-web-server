@@ -90,7 +90,7 @@ export interface AIEngineConfig {
 }
 
 export interface AIParseResult {
-  type: TransactionType;
+  type: TransactionType | 'customer_ledger';
   amount: number;
   currency: string;
   category: string;
@@ -103,6 +103,7 @@ export interface AIParseResult {
   engine_used: string;
   processing_time_ms: number;
   reasoning_tokens?: number;
+  customer?: Customer;
 }
 
 export interface NotificationItem {

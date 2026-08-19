@@ -35,7 +35,7 @@ export async function parseWithDeepSeek(
         messages: [
           {
             role: 'system',
-            content: buildSystemInstruction(categories, accounts),
+            content: buildSystemInstruction(categories, accounts, customers),
           },
           {
             role: 'user',
