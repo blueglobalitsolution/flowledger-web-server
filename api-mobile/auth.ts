@@ -2,19 +2,7 @@ import { Request, Response, Router } from 'express';
 import type { AuthSession, AuthUser, UserRole } from '@shared/types';
 import nodemailer from 'nodemailer';
 
-// Duplicated from main API for the standalone mobile backend
-const DEMO_ACCOUNTS: Record<string, AuthUser> = {
-  'mehul@flowledger.app': {
-    id: 'usr-001',
-    name: 'Mehul Solanki',
-    email: 'mehul@flowledger.app',
-    role: 'user',
-    tenantName: 'Personal Wallet',
-    twoFactorEnabled: true,
-    biometricRegistered: true,
-    plan: 'Pro Plan',
-  }
-};
+import { authStore } from '../api/authStore';
 
 interface OtpEntry {
   otp: string;
@@ -86,12 +74,12 @@ authRouter.post('/mobile-signup', (req: Request, res: Response) => {
     return res.status(400).json({ error: 'Name and email are required.' });
   }
 
-  if (DEMO_ACCOUNTS[lowerEmail]) {
+  if (authStore.getUserByEmail(lowerEmail)) {
     return res.status(400).json({ error: 'An account with this email already exists.' });
   }
 
-  // Create new user in memory
-  DEMO_ACCOUNTS[lowerEmail] = {
+  // Create new user in database
+  authStore.createUser({
     id: `usr-${Date.now()}`,
     name: name.trim(),
     email: lowerEmail,
@@ -100,7 +88,7 @@ authRouter.post('/mobile-signup', (req: Request, res: Response) => {
     twoFactorEnabled: false,
     biometricRegistered: false,
     plan: 'Free Plan',
-  };
+  });
 
   console.log(`[MOBILE AUTH] New user registered: ${lowerEmail}`);
   res.json({ success: true, message: 'Account created successfully.' });
@@ -111,7 +99,7 @@ authRouter.post('/mobile-login-request', async (req: Request, res: Response) => 
   const { email } = req.body ?? {};
   const lowerEmail = (email || '').toLowerCase().trim();
 
-  const user = DEMO_ACCOUNTS[lowerEmail];
+  const user = authStore.getUserByEmail(lowerEmail);
   if (!user) {
     return res.status(404).json({ error: 'You are not an authorized user.' });
   }
@@ -153,7 +141,7 @@ authRouter.post('/mobile-login-verify', (req: Request, res: Response) => {
   // OTP is valid!
   otpStore.delete(lowerEmail);
 
-  const baseUser = DEMO_ACCOUNTS[lowerEmail];
+  const baseUser = authStore.getUserByEmail(lowerEmail);
   if (!baseUser) {
     return res.status(404).json({ error: 'User account not found.' });
   }

@@ -22,28 +22,7 @@ function loadEnv() {
 }
 loadEnv();
 
-const DEMO_ACCOUNTS: Record<string, AuthUser> = {
-  'bhavanbadhe@gmail.com': {
-    id: 'usr-001',
-    name: 'Bhavan',
-    email: 'bhavanbadhe@gmail.com',
-    role: 'user',
-    tenantName: 'Personal Wallet',
-    twoFactorEnabled: false,
-    biometricRegistered: false,
-    plan: 'Pro Plan',
-  },
-  'mehul@flowledger.app': {
-    id: 'usr-001',
-    name: 'Mehul Solanki',
-    email: 'mehul@flowledger.app',
-    role: 'superadmin',
-    tenantName: 'FlowLedger SaaS Infrastructure',
-    twoFactorEnabled: true,
-    biometricRegistered: true,
-    plan: 'Super Admin Root Access',
-  },
-};
+import { authStore } from './authStore';
 
 
 
@@ -112,7 +91,7 @@ authRouter.post('/login-otp', async (req: Request, res: Response) => {
   const { email } = req.body ?? {};
   const lowerEmail = (email || '').toLowerCase().trim();
 
-  const user = Object.values(DEMO_ACCOUNTS).find((acc) => acc.email.toLowerCase() === lowerEmail);
+  const user = authStore.getUserByEmail(lowerEmail);
   if (!user) {
     return res.status(404).json({ error: 'Account not found. Please register first.' });
   }
@@ -150,10 +129,13 @@ authRouter.post('/verify-login-otp', (req: Request, res: Response) => {
     return res.status(400).json({ error: 'Invalid OTP code.' });
   }
 
-  const userTemplate = Object.values(DEMO_ACCOUNTS).find(acc => acc.email.toLowerCase() === lowerEmail) || DEMO_ACCOUNTS.user;
+  const userTemplate = authStore.getUserByEmail(lowerEmail);
+  if (!userTemplate) {
+    return res.status(404).json({ error: 'User account not found.' });
+  }
+
   const user: AuthUser = {
     ...userTemplate,
-    email: lowerEmail,
     id: `usr-${Date.now()}`,
   };
 
