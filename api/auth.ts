@@ -139,59 +139,6 @@ authRouter.post('/login', (req: Request, res: Response) => {
   res.json(session);
 });
 
-// Passwordless Login Step 1: Send OTP
-authRouter.post('/login-otp', async (req: Request, res: Response) => {
-  const { email } = req.body ?? {};
-  const lowerEmail = (email || '').toLowerCase().trim();
-
-  const user = Object.values(DEMO_ACCOUNTS).find((acc) => acc.email.toLowerCase() === lowerEmail);
-  if (!user) {
-    return res.status(404).json({ error: 'Account not found. Please register first.' });
-  }
-
-  const otp = Math.floor(100000 + Math.random() * 900000).toString();
-  const expiresAt = Date.now() + 3 * 60 * 1000;
-  otpStore.set(lowerEmail, { otp, expiresAt, verified: false });
-
-  const isSent = await sendOtpEmail(lowerEmail, otp);
-
-  res.json({
-    success: true,
-    message: isSent ? 'OTP sent to your email.' : 'OTP generated (SMTP not configured, check console).',
-    otp: isSent ? undefined : otp, // send back if dev fallback
-  });
-});
-
-// Passwordless Login Step 2: Verify OTP and Login
-authRouter.post('/verify-login-otp', (req: Request, res: Response) => {
-  const { email, otp } = req.body ?? {};
-  const lowerEmail = (email || '').toLowerCase().trim();
-
-  const entry = otpStore.get(lowerEmail);
-  if (!entry) {
-    return res.status(400).json({ error: 'No active OTP verification session found.' });
-  }
-  if (Date.now() > entry.expiresAt) {
-    otpStore.delete(lowerEmail);
-    return res.status(400).json({ error: 'The OTP code has expired.' });
-  }
-  if (entry.otp !== otp) {
-    return res.status(400).json({ error: 'Invalid OTP code.' });
-  }
-
-  const userTemplate = Object.values(DEMO_ACCOUNTS).find(acc => acc.email.toLowerCase() === lowerEmail) || DEMO_ACCOUNTS.user;
-  const user: AuthUser = {
-    ...userTemplate,
-    email: lowerEmail,
-    id: `usr-${Date.now()}`,
-  };
-
-  const token = Buffer.from(JSON.stringify({ sub: user.email, role: user.role } satisfies AuthPayload)).toString('base64');
-  const session: AuthSession = { user, token };
-
-  otpStore.delete(lowerEmail);
-  res.json(session);
-});
 
 
 // Forgot Password Step 1: Send OTP email
