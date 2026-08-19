@@ -104,7 +104,7 @@ export interface NotificationItem {
   read: boolean;
 }
 
-export type UserRole = 'user';
+export type UserRole = 'user' | 'admin' | 'superadmin';
 
 export interface AuthUser {
   id: string;

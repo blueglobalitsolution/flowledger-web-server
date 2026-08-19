@@ -37,26 +37,6 @@ const DEMO_ACCOUNTS: Record<string, AuthUser> = {
     id: 'usr-001',
     name: 'Mehul Solanki',
     email: 'mehul@flowledger.app',
-    role: 'user',
-    tenantName: 'Personal Wallet',
-    twoFactorEnabled: true,
-    biometricRegistered: true,
-    plan: 'Pro Plan',
-  },
-  admin: {
-    id: 'usr-002',
-    name: 'Sarah Jenkins (TechCorp Admin)',
-    email: 'sarah.jenkins@techcorp.io',
-    role: 'admin',
-    tenantName: 'TechCorp Pvt Ltd',
-    twoFactorEnabled: true,
-    biometricRegistered: true,
-    plan: 'Enterprise Admin',
-  },
-  superadmin: {
-    id: 'usr-003',
-    name: 'Alex Rivera (Root Super Admin)',
-    email: 'alex.rivera@flowledger.app',
     role: 'superadmin',
     tenantName: 'FlowLedger SaaS Infrastructure',
     twoFactorEnabled: true,
@@ -143,10 +123,14 @@ authRouter.post('/login-otp', async (req: Request, res: Response) => {
 
   const isSent = await sendOtpEmail(lowerEmail, otp);
 
+  // Never expose the OTP in the response in production. Only return it in
+  // non-production as a dev convenience when SMTP is unavailable.
+  const devFallbackOtp = process.env.NODE_ENV !== 'production' && !isSent ? otp : undefined;
+
   res.json({
     success: true,
     message: isSent ? 'OTP sent to your email.' : 'OTP generated (SMTP not configured, check console).',
-    otp: isSent ? undefined : otp, // send back if dev fallback
+    otp: devFallbackOtp,
   });
 });
 

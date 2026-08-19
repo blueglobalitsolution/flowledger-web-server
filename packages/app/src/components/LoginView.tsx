@@ -70,7 +70,6 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLogin }) => {
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   const [step, setStep] = useState<Step>('login-email');
-  const [simulatedOtp, setSimulatedOtp] = useState<string | null>(null);
 
   const clearMessages = () => {
     setErrorMsg(null);
@@ -82,7 +81,6 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLogin }) => {
   const handleRequestOtp = async (e: React.FormEvent) => {
     e.preventDefault();
     clearMessages();
-    setSimulatedOtp(null);
     
     if (!email) {
       setErrorMsg('Please enter your email.');
@@ -92,8 +90,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLogin }) => {
     try {
       const res = await requestLoginOtp(email);
       if (res.success) {
-        setAuthSuccessMsg(res.otp ? 'OTP code generated.' : 'OTP code sent to your email.');
-        if (res.otp) setSimulatedOtp(res.otp);
+        setAuthSuccessMsg('OTP sent to your email.');
         setStep('login-otp');
       }
     } catch (err: any) {
@@ -246,30 +243,6 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLogin }) => {
               }}
             >
               {errorMsg}
-            </div>
-          )}
-
-          {/* SMTP fallback OTP banner */}
-          {simulatedOtp && (
-            <div
-              style={{
-                padding: '12px 16px',
-                background: 'rgba(140, 99, 230, 0.12)',
-                border: '1px solid rgba(140, 99, 230, 0.3)',
-                borderRadius: '10px',
-                fontSize: '12px',
-                color: '#c4b5fd',
-                fontWeight: 500,
-                marginBottom: '20px',
-                lineHeight: '1.6',
-                textAlign: 'center',
-              }}
-            >
-              [DEVELOPER MODE] SMTP not configured<br />
-              Code:{' '}
-              <strong style={{ color: '#ffffff', fontSize: '18px', letterSpacing: '4px', fontFamily: 'monospace' }}>
-                {simulatedOtp}
-              </strong>
             </div>
           )}
 
