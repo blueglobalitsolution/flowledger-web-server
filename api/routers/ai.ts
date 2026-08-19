@@ -51,7 +51,6 @@ aiRouter.post('/ai/parse', async (req, res) => {
       parsedData = parsedData ?? fallbackParseFinancialText(text, accountNames, categories);
     }
 
-    
     const processingTime = Date.now() - startTime;
 
     if (parsedData && parsedData.type === 'chat') {
@@ -97,7 +96,6 @@ aiRouter.post('/ai/parse', async (req, res) => {
       return;
     }
 
-
     const type = parsedData.type === 'income' || parsedData.type === 'transfer' ? parsedData.type : 'expense';
     const categoryResult = resolveCategory(type, parsedData.category, text, categories);
 
@@ -113,111 +111,7 @@ aiRouter.post('/ai/parse', async (req, res) => {
     const result = {
       type,
       amount: Number(parsedData.amount) || 0,
-      currency: parsedData.currency || (text.includes('
-
-    res.json(result);
-  } catch (error: any) {
-    res.status(500).json({ error: 'Failed to parse financial prompt', details: error.message });
-  }
-});
-
-aiRouter.get('/ai/benchmark', (req, res) => {
-  res.json({
-    engines: [
-      { id: DEEPSEEK_MODEL, name: 'DeepSeek', latency_ms: 145, tokens_sec: 118, accuracy: 96.4, json_compliance: 99.2, provider: 'DeepSeek API (Hosted)' },
-      { id: 'qwen2.5:3b', name: 'Qwen 2.5 3B Instruct', latency_ms: 145, tokens_sec: 118, accuracy: 96.4, json_compliance: 99.2, vram_mb: 1929 },
-    ],
-    system_status: {
-      provider: 'DeepSeek API (Hosted) · Ollama fallback',
-      active_engine: `DeepSeek (${DEEPSEEK_MODEL})`,
-      gpu_utilization: '—',
-      vram_used: '—',
-      total_requests_parsed: 14820,
-      average_confidence: '95.8%',
-      auto_saved_ratio: '88.4%',
-    },
-  });
-});
-
-aiRouter.get('/openapi.json', (req, res) => {
-  res.json({
-    openapi: '3.0.3',
-    info: {
-      title: 'FlowLedger FastAPI Gateway',
-      version: '1.0.0',
-      description: 'REST API & AI Service Gateway for FlowLedger Financial Platform v1.0',
-    },
-    paths: {
-      '/auth/login': { post: { summary: 'Authenticate user & issue session', responses: { '200': { description: 'Session token + user' } } } },
-      '/transactions': {
-        get: { summary: 'List financial transactions with filters' },
-        post: { summary: 'Create or bulk insert transactions' },
-      },
-      '/ai/parse': {
-        post: {
-          summary: 'Natural Language Transaction Parsing via local Ollama Qwen',
-          requestBody: { content: { 'application/json': { schema: { type: 'object', properties: { text: { type: 'string' }, engine: { type: 'string' } } } } } },
-          responses: { '200': { description: 'Structured JSON transaction object with confidence score' } },
-        },
-      },
-      '/admin/telemetry': { get: { summary: 'Admin tenant/roster telemetry (role: admin+)' } },
-      '/superadmin/telemetry': { get: { summary: 'Super Admin full telemetry (role: superadmin)' } },
-    },
-  });
-});
-) ? '
-
-    res.json(result);
-  } catch (error: any) {
-    res.status(500).json({ error: 'Failed to parse financial prompt', details: error.message });
-  }
-});
-
-aiRouter.get('/ai/benchmark', (req, res) => {
-  res.json({
-    engines: [
-      { id: DEEPSEEK_MODEL, name: 'DeepSeek', latency_ms: 145, tokens_sec: 118, accuracy: 96.4, json_compliance: 99.2, provider: 'DeepSeek API (Hosted)' },
-      { id: 'qwen2.5:3b', name: 'Qwen 2.5 3B Instruct', latency_ms: 145, tokens_sec: 118, accuracy: 96.4, json_compliance: 99.2, vram_mb: 1929 },
-    ],
-    system_status: {
-      provider: 'DeepSeek API (Hosted) · Ollama fallback',
-      active_engine: `DeepSeek (${DEEPSEEK_MODEL})`,
-      gpu_utilization: '—',
-      vram_used: '—',
-      total_requests_parsed: 14820,
-      average_confidence: '95.8%',
-      auto_saved_ratio: '88.4%',
-    },
-  });
-});
-
-aiRouter.get('/openapi.json', (req, res) => {
-  res.json({
-    openapi: '3.0.3',
-    info: {
-      title: 'FlowLedger FastAPI Gateway',
-      version: '1.0.0',
-      description: 'REST API & AI Service Gateway for FlowLedger Financial Platform v1.0',
-    },
-    paths: {
-      '/auth/login': { post: { summary: 'Authenticate user & issue session', responses: { '200': { description: 'Session token + user' } } } },
-      '/transactions': {
-        get: { summary: 'List financial transactions with filters' },
-        post: { summary: 'Create or bulk insert transactions' },
-      },
-      '/ai/parse': {
-        post: {
-          summary: 'Natural Language Transaction Parsing via local Ollama Qwen',
-          requestBody: { content: { 'application/json': { schema: { type: 'object', properties: { text: { type: 'string' }, engine: { type: 'string' } } } } } },
-          responses: { '200': { description: 'Structured JSON transaction object with confidence score' } },
-        },
-      },
-      '/admin/telemetry': { get: { summary: 'Admin tenant/roster telemetry (role: admin+)' } },
-      '/superadmin/telemetry': { get: { summary: 'Super Admin full telemetry (role: superadmin)' } },
-    },
-  });
-});
- : '₹'),
+      currency: parsedData.currency || (text.includes('$') ? '$' : '₹'),
       category: categoryResult.category,
       description: parsedData.description || text,
       account: resolveAccount(parsedData.account, accountNames, text),
