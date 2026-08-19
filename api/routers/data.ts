@@ -61,6 +61,64 @@ dataRouter.delete('/transactions/:id', isUser, (req, res) => {
   res.json({ success: true });
 });
 
+
+// --- Customers ---
+
+dataRouter.get('/customers', isUser, (req, res) => {
+  const store = getStore((req as any).auth.sub);
+  res.json({ customers: store.listCustomers() });
+});
+
+dataRouter.post('/customers', isUser, (req, res) => {
+  const store = getStore((req as any).auth.sub);
+  const body = req.body ?? {};
+  
+  if (!body.id || !body.name) {
+    res.status(400).json({ error: 'id and name are required' });
+    return;
+  }
+  
+  const c = {
+    id: body.id,
+    name: body.name,
+    labelName: body.labelName || 'VIP',
+    labelColor: typeof body.labelColor === 'number' ? body.labelColor : 0,
+    baseIncome: typeof body.baseIncome === 'number' ? body.baseIncome : 0,
+    baseExpense: typeof body.baseExpense === 'number' ? body.baseExpense : 0,
+    service: body.service || ''
+  };
+  
+  store.addCustomer(c as any);
+  broadcastChange();
+  res.status(201).json({ customer: c });
+});
+
+dataRouter.put('/customers/:id', isUser, (req, res) => {
+  const store = getStore((req as any).auth.sub);
+  const body = req.body ?? {};
+  
+  const c = {
+    id: req.params.id,
+    name: body.name,
+    labelName: body.labelName,
+    labelColor: body.labelColor,
+    baseIncome: body.baseIncome,
+    baseExpense: body.baseExpense,
+    service: body.service
+  };
+  
+  store.updateCustomer(c as any);
+  broadcastChange();
+  res.json({ customer: c });
+});
+
+dataRouter.delete('/customers/:id', isUser, (req, res) => {
+  const store = getStore((req as any).auth.sub);
+  store.deleteCustomer(req.params.id);
+  broadcastChange();
+  res.json({ status: 'ok' });
+});
+
 dataRouter.get('/accounts', isUser, (req, res) => {
   const store = getStore((req as any).auth.sub);
   res.json({ accounts: store.listAccounts() });

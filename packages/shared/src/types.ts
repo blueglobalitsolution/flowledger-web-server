@@ -65,6 +65,16 @@ export interface BudgetAlert {
   alertThreshold: number;
 }
 
+export interface Customer {
+  id: string;
+  name: string;
+  labelName: string;
+  labelColor: number;
+  baseIncome: number;
+  baseExpense: number;
+  service: string;
+}
+
 export interface AIEngineConfig {
   id: string;
   name: string;

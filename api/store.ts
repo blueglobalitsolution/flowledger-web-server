@@ -1,7 +1,7 @@
 import { DatabaseSync } from 'node:sqlite';
 import { dirname, join, resolve } from 'node:path';
 import { mkdirSync } from 'node:fs';
-import type { Account, Budget, BudgetAlert, Category, Transaction, TransactionType } from '@shared/types';
+import type { Account, Budget, BudgetAlert, Category, Customer, Transaction, TransactionType } from '@shared/types';
 
 export const DEFAULT_ALERT_THRESHOLD = 90;
 export const SEPARATOR = ' > ';
@@ -81,6 +81,16 @@ export class UserStore {
         color TEXT NOT NULL,
         budgetLimit REAL,
         keywords TEXT
+      );
+
+      CREATE TABLE IF NOT EXISTS customers (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        labelName TEXT NOT NULL,
+        labelColor INTEGER NOT NULL,
+        baseIncome REAL NOT NULL,
+        baseExpense REAL NOT NULL,
+        service TEXT NOT NULL
       );
     `);
 
@@ -224,6 +234,32 @@ export class UserStore {
       throw err;
     }
     return updated;
+  }
+
+
+  // --- Customers ---
+
+  public listCustomers(): Customer[] {
+    return this.db.prepare('SELECT * FROM customers').all() as Customer[];
+  }
+
+  public addCustomer(c: Customer): void {
+    this.db.prepare(`
+      INSERT INTO customers (id, name, labelName, labelColor, baseIncome, baseExpense, service)
+      VALUES (@id, @name, @labelName, @labelColor, @baseIncome, @baseExpense, @service)
+    `).run(c as any);
+  }
+
+  public updateCustomer(c: Customer): void {
+    this.db.prepare(`
+      UPDATE customers 
+      SET name = @name, labelName = @labelName, labelColor = @labelColor, baseIncome = @baseIncome, baseExpense = @baseExpense, service = @service
+      WHERE id = @id
+    `).run(c as any);
+  }
+
+  public deleteCustomer(id: string): void {
+    this.db.prepare('DELETE FROM customers WHERE id = ?').run(id);
   }
 
   // --- Accounts ---
