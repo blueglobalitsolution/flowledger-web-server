@@ -293,6 +293,7 @@ export function fallbackParseFinancialText(text: string, accounts?: string[], ca
     lower.includes('recive') || 
     lower.includes('recieved') || 
     lower.includes('got') || 
+    lower.includes('get') || 
     lower.includes('credited') || 
     lower.includes('deposit') || 
     lower.includes('refund') || 
