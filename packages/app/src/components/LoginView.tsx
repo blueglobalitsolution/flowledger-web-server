@@ -1,12 +1,12 @@
 import React, { useState } from 'react';
 import { AuthUser, UserRole } from '@shared/types';
-import { login, forgotPassword, verifyOtp, resetPassword } from '@shared/api';
+import { requestLoginOtp, verifyLoginOtp } from '@shared/api';
 
 interface LoginViewProps {
   onLogin: (user: AuthUser) => void;
 }
 
-export const DEMO_USERS: Record<UserRole, AuthUser> = {
+const DEMO_USERS: Record<UserRole, AuthUser> = {
   user: {
     id: 'usr-001',
     name: 'Mehul Solanki',
@@ -19,7 +19,7 @@ export const DEMO_USERS: Record<UserRole, AuthUser> = {
   },
 };
 
-type Step = 'login' | 'forgot-email' | 'forgot-otp' | 'forgot-reset';
+type Step = 'login-email' | 'login-otp';
 
 // ── Shared style helpers ──
 const inputStyle: React.CSSProperties = {
@@ -75,15 +75,12 @@ const ghostBtnStyle: React.CSSProperties = {
 };
 
 export const LoginView: React.FC<LoginViewProps> = ({ onLogin }) => {
-  const [email, setEmail] = useState(DEMO_USERS.user.email);
-  const [password, setPassword] = useState('');
+  const [email, setEmail] = useState('');
   const [authSuccessMsg, setAuthSuccessMsg] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
-  const [step, setStep] = useState<Step>('login');
+  const [step, setStep] = useState<Step>('login-email');
   const [otp, setOtp] = useState('');
-  const [newPassword, setNewPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
   const [simulatedOtp, setSimulatedOtp] = useState<string | null>(null);
 
   const clearMessages = () => {
@@ -91,84 +88,56 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLogin }) => {
     setAuthSuccessMsg(null);
   };
 
-  const handleFormSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    clearMessages();
-    try {
-      setAuthSuccessMsg(`Verifying login for ${email}…`);
-      const session = await login(email, 'user');
-      setTimeout(() => onLogin(session.user), 400);
-    } catch (err: any) {
-      setAuthSuccessMsg(null);
-      setErrorMsg(err.message || 'Login failed. Please try again.');
-    }
-  };
-
-  const handleForgotEmailSubmit = async (e: React.FormEvent) => {
+  const handleRequestOtp = async (e: React.FormEvent) => {
     e.preventDefault();
     clearMessages();
     setSimulatedOtp(null);
+    
+    if (!email) {
+      setErrorMsg('Please enter your email or phone number.');
+      return;
+    }
+
     try {
-      const res = await forgotPassword(email);
+      const res = await requestLoginOtp(email);
       if (res.success) {
-        setAuthSuccessMsg(res.otp ? 'OTP code generated.' : 'OTP code sent to your email.');
+        setAuthSuccessMsg(res.otp ? 'OTP code generated.' : 'OTP code sent to your phone/email.');
         if (res.otp) setSimulatedOtp(res.otp);
-        setStep('forgot-otp');
+        setStep('login-otp');
       }
     } catch (err: any) {
-      setErrorMsg(err.message || 'Failed to request password reset.');
+      setErrorMsg(err.message || 'Failed to request OTP. Ensure you are registered.');
     }
   };
 
-  const handleVerifyOtpSubmit = async (e: React.FormEvent) => {
+  const handleVerifyOtp = async (e: React.FormEvent) => {
     e.preventDefault();
     clearMessages();
+    
+    if (otp.length < 6) {
+      setErrorMsg('Please enter the full 6-digit OTP.');
+      return;
+    }
+
     try {
-      const res = await verifyOtp(email, otp);
-      if (res.success) {
-        setAuthSuccessMsg('OTP verified.');
-        setStep('forgot-reset');
-      }
+      setAuthSuccessMsg(`Verifying OTP...`);
+      const session = await verifyLoginOtp(email, otp);
+      setAuthSuccessMsg(`Success! Logging in...`);
+      setTimeout(() => onLogin(session.user), 500);
     } catch (err: any) {
+      setAuthSuccessMsg(null);
       setErrorMsg(err.message || 'Invalid or expired OTP.');
     }
   };
 
-  const handleResetPasswordSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    clearMessages();
-    if (newPassword !== confirmPassword) {
-      setErrorMsg('Passwords do not match.');
-      return;
-    }
-    try {
-      const res = await resetPassword(email, otp, newPassword);
-      if (res.success) {
-        setAuthSuccessMsg('Password updated! You can now log in.');
-        setStep('login');
-        setPassword('');
-        setOtp('');
-        setNewPassword('');
-        setConfirmPassword('');
-        setSimulatedOtp(null);
-      }
-    } catch (err: any) {
-      setErrorMsg(err.message || 'Failed to reset password.');
-    }
-  };
-
   const titles: Record<Step, string> = {
-    'login': 'Welcome back',
-    'forgot-email': 'Reset your password',
-    'forgot-otp': 'Enter verification code',
-    'forgot-reset': 'Choose a new password',
+    'login-email': 'Welcome back',
+    'login-otp': 'Enter verification code',
   };
 
   const subtitles: Record<Step, string> = {
-    'login': 'Sign in to your FlowLedger account',
-    'forgot-email': "We'll send a 6-digit OTP to your email",
-    'forgot-otp': `Code sent to ${email} — valid for 3 minutes`,
-    'forgot-reset': 'Your identity is verified — set a new password',
+    'login-email': 'Enter your registered email or phone number to sign in',
+    'login-otp': `Code sent to ${email} — valid for 3 minutes`,
   };
 
   return (
@@ -305,60 +274,26 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLogin }) => {
                 textAlign: 'center',
               }}
             >
-              [DEVELOPER MODE] SMTP not configured<br />
-              OTP:{' '}
+              [DEVELOPER MODE] OTP sent to device:<br />
+              Code:{' '}
               <strong style={{ color: '#ffffff', fontSize: '18px', letterSpacing: '4px', fontFamily: 'monospace' }}>
                 {simulatedOtp}
               </strong>
             </div>
           )}
 
-          {/* ─── LOGIN FORM ─── */}
-          {step === 'login' && (
-            <form onSubmit={handleFormSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
+          {/* ─── EMAIL/PHONE INPUT FORM ─── */}
+          {step === 'login-email' && (
+            <form onSubmit={handleRequestOtp} style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
               <div>
-                <label style={labelStyle} htmlFor="email-login">Email address</label>
+                <label style={labelStyle} htmlFor="email-login">Email or Phone Number</label>
                 <input
                   id="email-login"
-                  type="email"
+                  type="text"
                   required
-                  autoComplete="email"
-                  placeholder="you@company.com"
+                  placeholder="e.g. you@company.com or 9876543210"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  style={inputStyle}
-                  onFocus={(e) => { (e.target as HTMLInputElement).style.borderColor = '#bcfc6a'; }}
-                  onBlur={(e) => { (e.target as HTMLInputElement).style.borderColor = '#252b37'; }}
-                />
-              </div>
-              <div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <label style={labelStyle} htmlFor="password-login">Password</label>
-                  <button
-                    type="button"
-                    onClick={() => { clearMessages(); setStep('forgot-email'); }}
-                    style={{
-                      background: 'none',
-                      border: 'none',
-                      color: '#bcfc6a',
-                      fontSize: '12px',
-                      fontWeight: 600,
-                      cursor: 'pointer',
-                      padding: 0,
-                      fontFamily: "'Inter', sans-serif",
-                    }}
-                  >
-                    Forgot password?
-                  </button>
-                </div>
-                <input
-                  id="password-login"
-                  type="password"
-                  required
-                  autoComplete="current-password"
-                  placeholder="••••••••••••"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
                   style={inputStyle}
                   onFocus={(e) => { (e.target as HTMLInputElement).style.borderColor = '#bcfc6a'; }}
                   onBlur={(e) => { (e.target as HTMLInputElement).style.borderColor = '#252b37'; }}
@@ -376,7 +311,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLogin }) => {
                   (e.currentTarget as HTMLElement).style.boxShadow = 'rgba(188, 252, 106, 0.2) 0px 4px 16px';
                 }}
               >
-                Sign in
+                Send OTP
               </button>
               <div style={{ textAlign: 'center' }}>
                 <button
@@ -392,41 +327,9 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLogin }) => {
             </form>
           )}
 
-          {/* ─── FORGOT EMAIL FORM ─── */}
-          {step === 'forgot-email' && (
-            <form onSubmit={handleForgotEmailSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
-              <div>
-                <label style={labelStyle} htmlFor="forgot-email-input">Email address</label>
-                <input
-                  id="forgot-email-input"
-                  type="email"
-                  required
-                  placeholder="you@company.com"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  style={inputStyle}
-                  onFocus={(e) => { (e.target as HTMLInputElement).style.borderColor = '#bcfc6a'; }}
-                  onBlur={(e) => { (e.target as HTMLInputElement).style.borderColor = '#252b37'; }}
-                />
-              </div>
-              <button type="submit" style={{ ...primaryBtnStyle, marginTop: '8px' }}>
-                Send OTP
-              </button>
-              <button
-                type="button"
-                onClick={() => { clearMessages(); setStep('login'); }}
-                style={ghostBtnStyle}
-                onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.color = '#ffffff'; }}
-                onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.color = '#535862'; }}
-              >
-                ← Back to Sign In
-              </button>
-            </form>
-          )}
-
           {/* ─── OTP VERIFY FORM ─── */}
-          {step === 'forgot-otp' && (
-            <form onSubmit={handleVerifyOtpSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
+          {step === 'login-otp' && (
+            <form onSubmit={handleVerifyOtp} style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
               <div>
                 <label style={labelStyle} htmlFor="otp-input">6-digit verification code</label>
                 <input
@@ -451,61 +354,23 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLogin }) => {
                 />
               </div>
               <button type="submit" style={{ ...primaryBtnStyle, marginTop: '8px' }}>
-                Verify Code
+                Verify & Login
               </button>
               <button
                 type="button"
-                onClick={handleForgotEmailSubmit}
+                onClick={handleRequestOtp}
                 style={{ ...ghostBtnStyle, color: '#bcfc6a' }}
               >
                 Resend OTP
               </button>
               <button
                 type="button"
-                onClick={() => { clearMessages(); setStep('forgot-email'); }}
+                onClick={() => { clearMessages(); setStep('login-email'); }}
                 style={ghostBtnStyle}
                 onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.color = '#ffffff'; }}
                 onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.color = '#535862'; }}
               >
-                Change email
-              </button>
-            </form>
-          )}
-
-          {/* ─── RESET PASSWORD FORM ─── */}
-          {step === 'forgot-reset' && (
-            <form onSubmit={handleResetPasswordSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
-              <div>
-                <label style={labelStyle} htmlFor="new-password">New password</label>
-                <input
-                  id="new-password"
-                  type="password"
-                  required
-                  minLength={6}
-                  placeholder="New password"
-                  value={newPassword}
-                  onChange={(e) => setNewPassword(e.target.value)}
-                  style={inputStyle}
-                  onFocus={(e) => { (e.target as HTMLInputElement).style.borderColor = '#bcfc6a'; }}
-                  onBlur={(e) => { (e.target as HTMLInputElement).style.borderColor = '#252b37'; }}
-                />
-              </div>
-              <div>
-                <label style={labelStyle} htmlFor="confirm-password">Confirm password</label>
-                <input
-                  id="confirm-password"
-                  type="password"
-                  required
-                  placeholder="Confirm password"
-                  value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
-                  style={inputStyle}
-                  onFocus={(e) => { (e.target as HTMLInputElement).style.borderColor = '#bcfc6a'; }}
-                  onBlur={(e) => { (e.target as HTMLInputElement).style.borderColor = '#252b37'; }}
-                />
-              </div>
-              <button type="submit" style={{ ...primaryBtnStyle, marginTop: '8px' }}>
-                Reset Password
+                Change Email/Phone
               </button>
             </form>
           )}

@@ -62,6 +62,22 @@ async function apiFetch<T>(path: string, options: RequestInit = {}): Promise<T> 
 }
 
 // ---- Auth ----
+export async function requestLoginOtp(email: string): Promise<{ success: boolean; message: string; otp?: string }> {
+  return apiFetch<{ success: boolean; message: string; otp?: string }>('/auth/login-otp', {
+    method: 'POST',
+    body: JSON.stringify({ email }),
+  });
+}
+
+export async function verifyLoginOtp(email: string, otp: string): Promise<AuthSession> {
+  const session = await apiFetch<AuthSession>('/auth/verify-login-otp', {
+    method: 'POST',
+    body: JSON.stringify({ email, otp }),
+  });
+  storeSession(session);
+  return session;
+}
+
 export async function login(email: string, role: UserRole): Promise<AuthSession> {
   const session = await apiFetch<AuthSession>('/auth/login', {
     method: 'POST',
