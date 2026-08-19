@@ -12,7 +12,8 @@ export const DEEPSEEK_MODEL = process.env.AI_MODEL || 'deepseek-chat';
 export async function parseWithDeepSeek(
   text: string,
   accounts?: string[],
-  categories?: Category[]
+  categories?: Category[],
+  customers?: any[]
 ): Promise<any | null> {
   const apiKey = process.env.AI_API_KEY;
   if (!apiKey) {

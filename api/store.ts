@@ -105,6 +105,7 @@ export class UserStore {
     
     const txCols = new Set((this.db.prepare('PRAGMA table_info(transactions)').all() as { name: string }[]).map((c) => c.name));
     if (!txCols.has('tags')) this.db.exec('ALTER TABLE transactions ADD COLUMN tags TEXT');
+    if (!txCols.has('customerId')) this.db.exec('ALTER TABLE transactions ADD COLUMN customerId TEXT');
 
     const accountCount = (this.db.prepare('SELECT COUNT(*) as count FROM accounts').get() as { count: number }).count;
     if (accountCount === 0) {
@@ -162,8 +163,8 @@ export class UserStore {
     let alert: BudgetAlert | undefined;
     this.db.exec('BEGIN IMMEDIATE');
     try {
-      this.db.prepare(`INSERT INTO transactions (id, type, amount, currency, category, description, account, payment_method, date, confidence, ai_parsed, engine_used, status, notes, tags) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(
-        tx.id, tx.type, tx.amount, tx.currency, tx.category, tx.description, tx.account, tx.payment_method, tx.date, tx.confidence ?? null, tx.ai_parsed ? 1 : 0, tx.engine_used ?? null, tx.status ?? null, tx.notes ?? null, tx.tags && tx.tags.length ? JSON.stringify(tx.tags) : null
+      this.db.prepare(`INSERT INTO transactions (id, type, amount, currency, category, description, account, payment_method, date, confidence, ai_parsed, engine_used, status, notes, tags, customerId) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(
+        tx.id, tx.type, tx.amount, tx.currency, tx.category, tx.description, tx.account, tx.payment_method, tx.date, tx.confidence ?? null, tx.ai_parsed ? 1 : 0, tx.engine_used ?? null, tx.status ?? null, tx.notes ?? null, tx.tags && tx.tags.length ? JSON.stringify(tx.tags) : null, tx.customerId ?? null
       );
       const account = this.db.prepare('SELECT * FROM accounts WHERE name = ?').get(tx.account) as any;
       if (account) {
@@ -207,8 +208,8 @@ export class UserStore {
     const updated: Transaction = { ...old, ...patch, id: old.id };
     this.db.exec('BEGIN IMMEDIATE');
     try {
-      this.db.prepare(`UPDATE transactions SET type = ?, amount = ?, currency = ?, category = ?, description = ?, account = ?, payment_method = ?, date = ?, confidence = ?, ai_parsed = ?, engine_used = ?, status = ?, notes = ?, tags = ? WHERE id = ?`).run(
-        updated.type, updated.amount, updated.currency, updated.category, updated.description, updated.account, updated.payment_method, updated.date, updated.confidence ?? null, updated.ai_parsed ? 1 : 0, updated.engine_used ?? null, updated.status ?? null, updated.notes ?? null, updated.tags && updated.tags.length ? JSON.stringify(updated.tags) : null, updated.id
+      this.db.prepare(`UPDATE transactions SET type = ?, amount = ?, currency = ?, category = ?, description = ?, account = ?, payment_method = ?, date = ?, confidence = ?, ai_parsed = ?, engine_used = ?, status = ?, notes = ?, tags = ?, customerId = ? WHERE id = ?`).run(
+        updated.type, updated.amount, updated.currency, updated.category, updated.description, updated.account, updated.payment_method, updated.date, updated.confidence ?? null, updated.ai_parsed ? 1 : 0, updated.engine_used ?? null, updated.status ?? null, updated.notes ?? null, updated.tags && updated.tags.length ? JSON.stringify(updated.tags) : null, updated.customerId ?? null, updated.id
       );
       const reverseDeltas = (acc: Transaction) => {
         const account = this.db.prepare('SELECT * FROM accounts WHERE name = ?').get(acc.account) as any;
@@ -369,7 +370,7 @@ export class UserStore {
   // --- Helpers ---
   private toTransaction(row: any): Transaction {
     return {
-      id: row.id, type: row.type, amount: row.amount, currency: row.currency, category: row.category, description: row.description, account: row.account, payment_method: row.payment_method, date: row.date, confidence: row.confidence ?? undefined, ai_parsed: row.ai_parsed ? true : undefined, engine_used: row.engine_used ?? undefined, status: row.status ?? undefined, notes: row.notes ?? undefined, tags: row.tags ? JSON.parse(row.tags) : undefined
+      id: row.id, type: row.type, amount: row.amount, currency: row.currency, category: row.category, description: row.description, account: row.account, payment_method: row.payment_method, date: row.date, confidence: row.confidence ?? undefined, ai_parsed: row.ai_parsed ? true : undefined, engine_used: row.engine_used ?? undefined, status: row.status ?? undefined, notes: row.notes ?? undefined, tags: row.tags ? JSON.parse(row.tags) : undefined, customerId: row.customerId ?? undefined
     };
   }
   private toCategory(row: any): Category {

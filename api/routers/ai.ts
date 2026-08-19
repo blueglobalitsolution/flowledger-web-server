@@ -116,6 +116,7 @@ aiRouter.post('/ai/parse', async (req, res) => {
       engine_used: engineUsed,
       processing_time_ms: Math.min(300, Math.max(45, processingTime)),
       reasoning_tokens: Math.floor(Math.random() * 35) + 15,
+      customerId: parsedData.customerId || null,
     };
 
     res.json(result);

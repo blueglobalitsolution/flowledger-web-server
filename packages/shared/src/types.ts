@@ -16,6 +16,8 @@ export interface Transaction {
   status?: 'completed' | 'pending' | 'flagged';
   notes?: string;
   tags?: string[];
+  customerId?: string | null;
+  customerName?: string | null;
 }
 
 export interface Account {

@@ -78,6 +78,7 @@ export function buildSystemInstruction(categories?: Category[], accounts?: strin
     `- date: YYYY-MM-DD string (default to today ${TODAY} if not mentioned)`,
     '- tags: array of strings from [Personal, Business, Family, Office, Travel, Tax Deductible, Reimbursable, Urgent, Recurring, One-Time, Client Project, Investment, Emergency] (infer the most relevant 1-3)',
     '- confidence: number between 60 and 99 reflecting confidence score',
+    customers && customers.length ? `- customerId: string (If the user refers to a customer in the CUSTOMERS LIST by name, look up their exact name and output their exact ID, e.g. "cust-1". If they do not refer to a customer in the list, set to null)` : '',
     categorySection,
     accountConstraint(accounts),
     buildCustomerInstruction(customers),
